@@ -8,6 +8,34 @@
 #define FLORA_POLL_INVAL -3
 #define FLORA_POLL_UNSUPP -4
 
+#ifdef __cplusplus
+#include <memory>
+
+namespace flora {
+
+class Dispatcher {
+public:
+	virtual ~Dispatcher() = default;
+
+	static std::shared_ptr<Dispatcher> new_instance(uint32_t msg_buf_size = 0);
+};
+
+class Poll {
+public:
+	virtual ~Poll() = default;
+
+	virtual int32_t start(std::shared_ptr<Dispatcher>& dispathcer) = 0;
+
+	virtual void stop() = 0;
+
+	static std::shared_ptr<Poll> new_instance(const char* uri);
+};
+
+} // namespace flora
+
+extern "C" {
+#endif
+
 typedef intptr_t flora_poll_t;
 typedef intptr_t flora_dispatcher_t;
 typedef void(*flora_received_func_t)(flora_dispatcher_t handle, const char* name, caps_t msg, void* arg);
@@ -49,3 +77,7 @@ void flora_poll_delete(flora_poll_t handle);
 int32_t flora_poll_start(flora_poll_t handle, flora_dispatcher_t dispatcher);
 
 void flora_poll_stop(flora_poll_t handle);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

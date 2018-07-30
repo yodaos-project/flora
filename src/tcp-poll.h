@@ -5,20 +5,24 @@
 #include <string>
 #include <thread>
 #include <mutex>
-#include "poll.h"
+#include "flora-svc.h"
 #include "tcp-adap.h"
+#include "disp.h"
 
 typedef std::map<int, std::shared_ptr<TCPAdapter> > AdapterMap;
 // typedef std::list<std::shared_ptr<Session> > SessionList;
 // typedef std::map<std::string, SessionList> SubscribeMap;
 
-class TCPPoll : public Poll {
+namespace flora {
+namespace internal {
+
+class TCPPoll : public flora::Poll {
 public:
 	TCPPoll(const std::string& host, int32_t port);
 
-	int32_t start(Dispatcher* disp);
+	int32_t start(std::shared_ptr<flora::Dispatcher>& disp);
 
-	void close();
+	void stop();
 
 private:
 	void run();
@@ -32,7 +36,7 @@ private:
 	bool read_from_client(std::shared_ptr<TCPAdapter>& adap);
 
 private:
-	Dispatcher* dispatcher = nullptr;
+	std::shared_ptr<Dispatcher> dispatcher;
 	int listen_fd = -1;
 	uint32_t max_msg_size = 0;
 	std::thread run_thread;
@@ -41,3 +45,6 @@ private:
 	std::string host;
 	int32_t port;
 };
+
+} // namespace internal
+} // namespace flora

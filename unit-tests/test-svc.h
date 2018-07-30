@@ -2,13 +2,21 @@
 
 #include "flora-svc.h"
 
+using namespace std;
+using namespace flora;
+
 class TestService {
 public:
-	bool run(const char* uri);
+	bool run(const char* uri, bool capi);
 
 	void close();
 
 private:
-	flora_dispatcher_t dispatcher = 0;
-	flora_poll_t fpoll = 0;
+	shared_ptr<Dispatcher> dispatcher;
+	shared_ptr<Poll> fpoll;
+
+	flora_dispatcher_t c_dispatcher = 0;
+	flora_poll_t c_fpoll = 0;
+
+	bool use_c_api = false;
 };

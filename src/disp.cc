@@ -2,6 +2,7 @@
 #include "flora-svc.h"
 #include "flora-cli.h"
 #include "disp.h"
+#include "ser-helper.h"
 #include "rlog.h"
 #include "caps.h"
 
@@ -9,102 +10,119 @@ using namespace std;
 
 #define TAG "flora.Dispatcher"
 
-bool (Dispatcher::*(Dispatcher::msg_handlers[MSG_HANDLER_COUNT]))(caps_t, std::shared_ptr<Adapter>&) = {
+namespace flora {
+namespace internal {
+
+bool (Dispatcher::*(Dispatcher::msg_handlers[MSG_HANDLER_COUNT]))(
+		shared_ptr<Caps>&, std::shared_ptr<Adapter>&) = {
 	&Dispatcher::handle_auth_req,
 	&Dispatcher::handle_subscribe_req,
 	&Dispatcher::handle_unsubscribe_req,
-	&Dispatcher::handle_post_req
+	&Dispatcher::handle_post_req,
+	&Dispatcher::handle_reply_req
 };
 
-Dispatcher::Dispatcher(uint32_t bufsize) {
+Dispatcher::Dispatcher(uint32_t bufsize) : reply_mgr(bufsize) {
 	buf_size = bufsize > DEFAULT_MSG_BUF_SIZE ? bufsize : DEFAULT_MSG_BUF_SIZE;
 	buffer = (int8_t*)mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
 			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 }
 
 Dispatcher::~Dispatcher() {
-	subscriptions.clear();
+	int32_t i;
+	for (i = 0; i < FLORA_NUMBER_OF_MSGTYPE; ++i) {
+		subscriptions[i].clear();
+	}
 	munmap(buffer, buf_size);
 }
 
 bool Dispatcher::put(Frame& frame, shared_ptr<Adapter>& sender) {
-	caps_t msg_caps;
+	shared_ptr<Caps> msg_caps;
 
-	if (caps_parse(frame.data, frame.size, &msg_caps) != CAPS_SUCCESS) {
+	if (Caps::parse(frame.data, frame.size, msg_caps, false)
+			!= CAPS_SUCCESS) {
 		KLOGE(TAG, "msg caps parse failed");
 		return false;
 	}
 
 	int32_t cmd;
-	if (caps_read_integer(msg_caps, &cmd) != CAPS_SUCCESS) {
-		caps_destroy(msg_caps);
+	if (msg_caps->read(cmd) != CAPS_SUCCESS) {
 		return false;
 	}
 	if (cmd < 0 || cmd >= MSG_HANDLER_COUNT) {
-		caps_destroy(msg_caps);
 		return false;
 	}
-	bool b = (this->*(msg_handlers[cmd]))(msg_caps, sender);
-	caps_destroy(msg_caps);
-	return b;
+	return (this->*(msg_handlers[cmd]))(msg_caps, sender);
 }
 
-bool Dispatcher::handle_auth_req(caps_t msg_caps, shared_ptr<Adapter>& sender) {
-	int32_t version;
+bool Dispatcher::handle_auth_req(shared_ptr<Caps>& msg_caps,
+		shared_ptr<Adapter>& sender) {
+	uint32_t version;
+	string extra;
 
-	if (caps_read_integer(msg_caps, &version) != CAPS_SUCCESS)
+	if (RequestParser::parse_auth(msg_caps, version, extra) != 0)
 		return false;
-	const char* extra;
-	if (caps_read_string(msg_caps, &extra) == CAPS_SUCCESS) {
-		sender->auth_extra = extra;
-	}
-
-	caps_t reply_caps = caps_create();
+	sender->auth_extra = extra;
 	int32_t result = FLORA_CLI_SUCCESS;
-	int32_t c;
-	caps_write_integer(reply_caps, CMD_AUTH_RESP);
 	if (version < FLORA_VERSION) {
 		result = FLORA_CLI_EAUTH;
-		KLOGE(TAG, "version %d not supported, protocol version is %d", version, FLORA_VERSION);
+		KLOGE(TAG, "version %u not supported, protocol version is %d",
+				version, FLORA_VERSION);
 	}
-	caps_write_integer(reply_caps, result);
-	c = caps_serialize(reply_caps, buffer, buf_size);
-	if (c < 0) {
-		caps_destroy(reply_caps);
+	int32_t c = ResponseSerializer::serialize_auth(result, buffer,
+			buf_size);
+	if (c < 0)
 		return false;
-	}
 	sender->write(buffer, c);
-	caps_destroy(reply_caps);
 	return true;
 }
 
-bool Dispatcher::handle_subscribe_req(caps_t msg_caps, shared_ptr<Adapter>& sender) {
-	const char* name;
+bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
+		shared_ptr<Adapter>& sender) {
+	uint32_t msgtype;
+	string name;
 
-	if (caps_read_string(msg_caps, &name) != CAPS_SUCCESS)
+	if (RequestParser::parse_subscribe(msg_caps, name, msgtype) != 0)
 		return false;
-	if (name[0] == '\0')
+	if (!is_valid_msgtype(msgtype))
 		return false;
-	string name_str(name);
-	AdapterList& adapters = subscriptions[name_str];
+	if (name.length() == 0)
+		return false;
+	SubscriptionMap& submap = subscriptions[msgtype];
+	AdapterList& adapters = submap[name];
 	AdapterList::iterator it;
 	for (it = adapters.begin(); it != adapters.end(); ++it) {
 		if ((*it).get() == sender.get())
 			return true;
 	}
 	adapters.push_back(sender);
+
+	if (msgtype == FLORA_MSGTYPE_PERSIST) {
+		PersistMsgMap::iterator it = persist_msgs.find(name);
+		if (it != persist_msgs.end()) {
+			int32_t c = ResponseSerializer::serialize_post(name.c_str(),
+					msgtype, it->second.data, 0, buffer, buf_size);
+			if (c > 0) {
+				sender->write(buffer, c);
+			}
+		}
+	}
 	return true;
 }
 
-bool Dispatcher::handle_unsubscribe_req(caps_t msg_caps, shared_ptr<Adapter>& sender) {
-	const char* name;
+bool Dispatcher::handle_unsubscribe_req(shared_ptr<Caps>& msg_caps,
+		shared_ptr<Adapter>& sender) {
+	uint32_t msgtype;
+	string name;
 
-	if (caps_read_string(msg_caps, &name) != CAPS_SUCCESS)
+	if (RequestParser::parse_unsubscribe(msg_caps, name, msgtype) != 0)
 		return false;
-	if (name[0] == '\0')
+	if (!is_valid_msgtype(msgtype))
 		return false;
-	string name_str(name);
-	AdapterList& adapters = subscriptions[name_str];
+	if (name.length() == 0)
+		return false;
+	SubscriptionMap& submap = subscriptions[msgtype];
+	AdapterList& adapters = submap[name];
 	AdapterList::iterator it;
 	for (it = adapters.begin(); it != adapters.end(); ++it) {
 		if ((*it).get() == sender.get()) {
@@ -115,66 +133,115 @@ bool Dispatcher::handle_unsubscribe_req(caps_t msg_caps, shared_ptr<Adapter>& se
 	return true;
 }
 
-bool Dispatcher::handle_post_req(caps_t msg_caps, shared_ptr<Adapter>& sender) {
-	const char* name;
-	caps_t args = 0;
+bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
+		shared_ptr<Adapter>& sender) {
+	uint32_t msgtype;
+	uint32_t timeout;
+	string name;
+	shared_ptr<Caps> args;
+	int32_t cliid;
 
-	if (caps_read_string(msg_caps, &name) != CAPS_SUCCESS)
+	if (RequestParser::parse_post(msg_caps, name, msgtype, args,
+				cliid, timeout) != 0)
+		return false;
+	if (!is_valid_msgtype(msgtype))
 		return false;
 #ifdef FLORA_DEBUG
-	KLOGI(TAG, "recv msg %s from %s", name, sender->auth_extra.c_str());
+	KLOGI(TAG, "recv msg(%u) %s from %s", msgtype, name.c_str(),
+			sender->auth_extra.c_str());
 #endif
-	if (name[0] == '\0')
+	if (name.length() == 0)
 		return false;
-	caps_read_object(msg_caps, &args);
-	string name_str(name);
+
+	SubscriptionMap& submap = subscriptions[msgtype];
 	SubscriptionMap::iterator sit;
-	sit = subscriptions.find(name_str);
-	if (sit == subscriptions.end()) {
-		return true;
+	int32_t svrid = 0;
+
+	sit = submap.find(name);
+	if (msgtype == FLORA_MSGTYPE_REQUEST) {
+		svrid = ++reqseq;
+	} else {
+		if (sit == submap.end()) {
+			return true;
+		}
+		if (sit->second.empty()) {
+			return true;
+		}
 	}
-	if (sit->second.empty()) {
-		return true;
-	}
-	caps_t reply_caps = caps_create();
-	caps_write_integer(reply_caps, CMD_RECV_MSG);
-	caps_write_string(reply_caps, name);
-	if (args)
-		caps_write_object(reply_caps, args);
-	int32_t c = caps_serialize(reply_caps, buffer, buf_size);
-	if (c < 0) {
-		caps_destroy(reply_caps);
+	int32_t c = ResponseSerializer::serialize_post(name.c_str(), msgtype,
+			args, svrid, buffer, buf_size);
+	if (c < 0)
 		return false;
-	}
-	caps_destroy(reply_caps);
 	AdapterList::iterator ait;
-	ait = sit->second.begin();
-	while (ait != sit->second.end()) {
-		if ((*ait)->closed()) {
-			AdapterList::iterator dit = ait;
-			++ait;
-			sit->second.erase(dit);
-			continue;
-		}
-		if ((*ait).get() != sender.get()) {
+	if (sit != submap.end()) {
+		ait = sit->second.begin();
+		while (ait != sit->second.end()) {
+			if ((*ait)->closed()) {
+				AdapterList::iterator dit = ait;
+				++ait;
+				sit->second.erase(dit);
+				continue;
+			}
+			if ((*ait).get() != sender.get()) {
 #ifdef FLORA_DEBUG
-			KLOGI(TAG, "dispatch msg %s from %s to %s", name,
-					sender->auth_extra.c_str(), (*ait)->auth_extra.c_str());
+				KLOGI(TAG, "dispatch msg(%u) %s from %s to %s", msgtype, name.c_str(),
+						sender->auth_extra.c_str(), (*ait)->auth_extra.c_str());
 #endif
-			(*ait)->write(buffer, c);
+				(*ait)->write(buffer, c);
+			}
+			++ait;
 		}
-		++ait;
+	}
+
+	if (msgtype == FLORA_MSGTYPE_PERSIST) {
+		PersistMsg& pmsg = persist_msgs[name];
+		pmsg.data = args;
+	} else if (msgtype == FLORA_MSGTYPE_REQUEST) {
+#ifdef FLORA_DEBUG
+		KLOGI(TAG, "reply manager add request: sender %s, name %s, timeout %u",
+				sender->auth_extra.c_str(), name.c_str(), timeout);
+#endif
+		static AdapterList empty_adapter_list;
+		if (sit == submap.end())
+			reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, empty_adapter_list);
+		else
+			reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, sit->second);
 	}
 	return true;
 }
 
+bool Dispatcher::handle_reply_req(shared_ptr<Caps>& msg_caps,
+		shared_ptr<Adapter>& sender) {
+	string name;
+	shared_ptr<Caps> args;
+	int32_t id;
+	int32_t retcode;
+
+	if (RequestParser::parse_reply(msg_caps, name, args, id, retcode) != 0)
+		return false;
+#ifdef FLORA_DEBUG
+	KLOGI(TAG, "handle_reply_req, name %s, retcode %d", name.c_str(), retcode);
+#endif
+	if (name.length() == 0)
+		return false;
+	reply_mgr.put_reply(sender, name.c_str(), id, retcode, args);
+	return true;
+}
+
+} // namespace internal
+} // namespace flora
+
+shared_ptr<flora::Dispatcher> flora::Dispatcher::new_instance(uint32_t msg_buf_size) {
+	return static_pointer_cast<flora::Dispatcher>(
+			make_shared<flora::internal::Dispatcher>(msg_buf_size));
+}
 
 flora_dispatcher_t flora_dispatcher_new(uint32_t bufsize) {
-	return reinterpret_cast<flora_dispatcher_t>(new Dispatcher(bufsize));
+	return reinterpret_cast<flora_dispatcher_t>(new flora::internal::Dispatcher(bufsize));
 }
 
 void flora_dispatcher_delete(flora_dispatcher_t handle) {
 	if (handle) {
-		delete reinterpret_cast<Dispatcher*>(handle);
+		delete reinterpret_cast<flora::Dispatcher*>(handle);
 	}
 }

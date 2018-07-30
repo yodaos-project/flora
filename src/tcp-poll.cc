@@ -13,34 +13,37 @@ using namespace std;
 
 #define TAG "flora.TCPPoll"
 
+namespace flora {
+namespace internal {
+
 TCPPoll::TCPPoll(const std::string& host, int32_t port) {
 	this->host = host;
 	this->port = port;
 }
 
-int32_t TCPPoll::start(Dispatcher* disp) {
+int32_t TCPPoll::start(shared_ptr<flora::Dispatcher>& disp) {
 	lock_guard<mutex> locker(start_mutex);
-	if (dispatcher)
+	if (dispatcher.get())
 		return FLORA_POLL_ALREADY_START;
 	if (!init_socket()) {
 		return FLORA_POLL_SYSERR;
 	}
 	run_thread = thread([this]() { this->run(); });
-	dispatcher = disp;
-	max_msg_size = disp->max_msg_size();
+	dispatcher = static_pointer_cast<Dispatcher>(disp);
+	max_msg_size = dispatcher->max_msg_size();
 	return FLORA_POLL_SUCCESS;
 }
 
-void TCPPoll::close() {
+void TCPPoll::stop() {
 	unique_lock<mutex> locker(start_mutex);
-	if (!dispatcher)
+	if (dispatcher.get() == nullptr)
 		return;
 	int fd = listen_fd;
 	listen_fd = -1;
 	::shutdown(fd, SHUT_RDWR);
 	run_thread.join();
 	::close(fd);
-	dispatcher = nullptr;
+	dispatcher.reset();
 }
 
 void TCPPoll::run() {
@@ -104,7 +107,6 @@ void TCPPoll::run() {
 	for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
 		delete_adapter(adap_it->first);
 	}
-	adapters.clear();
 }
 
 bool TCPPoll::init_socket() {
@@ -169,3 +171,6 @@ bool TCPPoll::read_from_client(shared_ptr<TCPAdapter>& adap) {
 	}
 	return true;
 }
+
+} // namespace internal
+} // namespace flora

@@ -44,6 +44,10 @@ set(flora_svc_SOURCES
 	src/tcp-poll.cc
 	src/disp.h
 	src/disp.cc
+	src/reply-mgr.h
+	src/reply-mgr.cc
+	src/ser-helper.h
+	src/ser-helper.cc
 )
 add_library(flora-svc SHARED
 	${flora_svc_SOURCES}
@@ -66,8 +70,8 @@ set(flora_cli_SOURCES
 	src/tcp-conn.h
 	src/tcp-conn.cc
 	src/defs.h
-	src/reqser.h
-	src/reqser.cc
+	src/ser-helper.h
+	src/ser-helper.cc
 )
 add_library(flora-cli SHARED
 	${flora_cli_SOURCES}

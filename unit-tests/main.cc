@@ -17,13 +17,15 @@ static void print_prompt(const char* progname) {
 		"USAGE: %s [options]\n"
 		"options:\n"
 		"--client-num=$TEST_CLIENT_NUM  (default value 2)\n"
-		"--repeat=$TEST_REPEAT_TIMES  (default value 2)\n";
+		"--repeat=$TEST_REPEAT_TIMES  (default value 1)\n"
+		"--use-c-api\n";
 	KLOGE(TAG, format, progname);
 }
 
 typedef struct {
 	int32_t client_num;
 	int32_t repeat;
+	int32_t use_c_api;
 } CmdlineArgs;
 
 static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
@@ -51,7 +53,7 @@ static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
 	}
 	v = clargs_opt_get(h, "repeat");
 	if (v == nullptr) {
-		args->repeat = 2;
+		args->repeat = 1;
 	} else {
 		args->repeat = strtol(v, &ep, 10);
 		if (ep[0] != '\0' || args->repeat <= 0) {
@@ -60,6 +62,10 @@ static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
 			return false;
 		}
 	}
+	if (clargs_opt_has(h, "use-c-api"))
+		args->use_c_api = 1;
+	else
+		args->use_c_api = 0;
 	clargs_destroy(h);
 	return true;
 }
@@ -83,17 +89,39 @@ static bool check_results(TestClient* clients, int32_t num) {
 		}
 
 		for (j = 0; j < FLORA_MSG_COUNT; ++j) {
-			if (clients[i].subscribe_flags[j]
-					&& clients[i].recv_counter[j] != post_counter[j]) {
-				KLOGE(TAG, "client %d, msg %d recv/post not equal %d/%d",
-						i, j, clients[i].recv_counter[j], post_counter[j]);
-				return false;
+			if (clients[i].subscribe_flags[j]) {
+				if (clients[i].recv_instant_counter[j] != post_counter[j]) {
+					KLOGE(TAG, "client %d, msg(instant) %d recv/post not equal %d/%d",
+							i, j, clients[i].recv_instant_counter[j], post_counter[j]);
+					return false;
+				}
+				if (clients[i].recv_persist_counter[j] != post_counter[j]) {
+					KLOGE(TAG, "client %d, msg(persist) %d recv/post not equal %d/%d",
+							i, j, clients[i].recv_persist_counter[j], post_counter[j]);
+					return false;
+				}
+				if (clients[i].recv_request_counter[j] != post_counter[j]) {
+					KLOGE(TAG, "client %d, msg(request) %d recv/post not equal %d/%d",
+							i, j, clients[i].recv_request_counter[j], post_counter[j]);
+					return false;
+				}
 			}
-			if (clients[i].subscribe_flags[j] == 0
-					&& clients[i].recv_counter[j] != 0) {
-				KLOGE(TAG, "client %d, msg %d should not received, but recv %d times",
-						i, j, clients[i].recv_counter[j]);
-				return false;
+			if (clients[i].subscribe_flags[j] == 0) {
+				if (clients[i].recv_instant_counter[j] != 0) {
+					KLOGE(TAG, "client %d, msg(instant) %d should not received, but recv %d times",
+							i, j, clients[i].recv_instant_counter[j]);
+					return false;
+				}
+				if (clients[i].recv_persist_counter[j] != 0) {
+					KLOGE(TAG, "client %d, msg(persist) %d should not received, but recv %d times",
+							i, j, clients[i].recv_persist_counter[j]);
+					return false;
+				}
+				if (clients[i].recv_request_counter[j] != 0) {
+					KLOGE(TAG, "client %d, msg(request) %d should not received, but recv %d times",
+							i, j, clients[i].recv_request_counter[j]);
+					return false;
+				}
 			}
 		}
 	}
@@ -107,10 +135,10 @@ int main(int argc, char** argv) {
 		return 0;
 
 	srand(time(nullptr));
-	TestClient::static_init();
+	TestClient::static_init(args.use_c_api);
 
 	TestService tsvc;
-	if (!tsvc.run(SERVICE_URI)) {
+	if (!tsvc.run(SERVICE_URI, args.use_c_api)) {
 		KLOGE(TAG, "service startup failed");
 		return 1;
 	}
@@ -121,7 +149,7 @@ int main(int argc, char** argv) {
 	char cli_uri[64];
 	for (i = 0; i < args.client_num; ++i) {
 		snprintf(cli_uri, sizeof(cli_uri), "%s#%03d", CONN_URI, i);
-		if (!clients[i].init(cli_uri)) {
+		if (!clients[i].init(cli_uri, args.use_c_api)) {
 			KLOGE(TAG, "client %d init failed", i);
 			tsvc.close();
 			return 1;
