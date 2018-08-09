@@ -88,8 +88,9 @@ target_link_libraries(flora-cli
 # install
 install(TARGETS flora-svc flora-cli
 	LIBRARY DESTINATION lib
-	PUBLIC_HEADER DESTINATION include
 )
+file(GLOB flora_headers include/*.h)
+install(FILES ${flora_headers} DESTINATION include)
 
 # unit-tests
 if (BUILD_TEST)
