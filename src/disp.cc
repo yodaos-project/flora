@@ -28,7 +28,7 @@ Dispatcher::Dispatcher(uint32_t bufsize) : reply_mgr(bufsize) {
 			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 }
 
-Dispatcher::~Dispatcher() {
+Dispatcher::~Dispatcher() noexcept {
 	int32_t i;
 	for (i = 0; i < FLORA_NUMBER_OF_MSGTYPE; ++i) {
 		subscriptions[i].clear();

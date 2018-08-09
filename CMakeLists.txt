@@ -38,7 +38,6 @@ set(flora_svc_SOURCES
 	src/adap.h
 	src/tcp-adap.h
 	src/tcp-adap.cc
-	src/poll.h
 	src/poll.cc
 	src/tcp-poll.h
 	src/tcp-poll.cc

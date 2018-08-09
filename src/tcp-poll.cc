@@ -127,7 +127,7 @@ bool TCPPoll::init_socket() {
 	addr.sin_family = AF_INET;
 	memcpy(&addr.sin_addr, hp->h_addr_list[0], sizeof(addr.sin_addr));
 	addr.sin_port = htons(port);
-	if (bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+	if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
 		::close(fd);
 		KLOGE(TAG, "socket bind failed: %s", strerror(errno));
 		return false;
