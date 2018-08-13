@@ -6,12 +6,21 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <list>
+#include <chrono>
 #include "flora-cli.h"
 #include "conn.h"
 #include "caps.h"
 
 namespace flora {
 namespace internal {
+
+typedef struct {
+	int32_t id;
+	std::vector<Reply>* results;
+	std::chrono::steady_clock::time_point timeout;
+} PendingRequest;
+typedef std::list<PendingRequest> PendingRequestList;
 
 class Client : public flora::Client {
 public:
@@ -50,10 +59,10 @@ private:
 	std::shared_ptr<Connection> connection;
 	std::thread recv_thread;
 	std::mutex cli_mutex;
+	std::mutex req_mutex;
 	std::condition_variable req_reply_cond;
+	PendingRequestList pending_requests;
 	int32_t reqseq = 0;
-	std::vector<Reply>* reply_results = nullptr;
-	int32_t* reply_code = nullptr;
 
 public:
 	std::string auth_extra;

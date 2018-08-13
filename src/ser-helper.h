@@ -68,7 +68,7 @@ public:
 			uint32_t& msgtype, std::shared_ptr<Caps>& args, int32_t& id);
 
 	static int32_t parse_reply(std::shared_ptr<Caps>& caps,
-			std::string& name, int32_t& id, std::vector<Reply>& replys);
+			std::string& name, std::vector<Reply>& replys);
 };
 
 bool is_valid_msgtype(uint32_t msgtype);

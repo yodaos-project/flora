@@ -232,13 +232,10 @@ int32_t ResponseParser::parse_post(shared_ptr<Caps>& caps, string& name,
 }
 
 int32_t ResponseParser::parse_reply(shared_ptr<Caps>& caps, string& name,
-		int32_t& id, vector<Reply>& replys) {
+		vector<Reply>& replys) {
 	int32_t count;
 	const char* s;
-	caps_t d;
 
-	if (caps->read(id) != CAPS_SUCCESS)
-		return -1;
 	if (caps->read_string(name) != CAPS_SUCCESS)
 		return -1;
 	if (caps->read(count) != CAPS_SUCCESS)

@@ -1,7 +1,6 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <assert.h>
-#include <chrono>
 #include "cli.h"
 #include "uri.h"
 #include "rlog.h"
@@ -67,9 +66,7 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 		KLOGE(TAG, "unsupported uri scheme %s", urip.scheme.c_str());
 		return FLORA_CLI_EINVAL;
 	}
-	cli_mutex.lock();
 	connection.reset(conn);
-	cli_mutex.unlock();
 	if (!auth(urip.fragment)) {
 		close(false);
 		return FLORA_CLI_EAUTH;
@@ -172,19 +169,26 @@ bool Client::handle_received(int32_t size) {
 			case CMD_REPLY_RESP: {
 				string name;
 				int32_t msgid;
+				PendingRequestList::iterator it;
 
-				cli_mutex.lock();
-				if (reply_results == nullptr) {
-					cli_mutex.unlock();
-					break;
-				}
-				if (ResponseParser::parse_reply(resp, name, msgid, *reply_results) != 0) {
-					cli_mutex.unlock();
+				req_mutex.lock();
+				if (resp->read(msgid) != CAPS_SUCCESS) {
+					req_mutex.unlock();
 					return false;
 				}
-				*reply_code = reply_results->empty() ? -1 : 0;
-				req_reply_cond.notify_one();
-				cli_mutex.unlock();
+
+				for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
+					if ((*it).id == msgid) {
+						(*it).id = -1;
+						if (ResponseParser::parse_reply(resp, name, *(*it).results) != 0) {
+							req_mutex.unlock();
+							return false;
+						}
+						req_reply_cond.notify_all();
+						break;
+					}
+				}
+				req_mutex.unlock();
 				break;
 			}
 			default:
@@ -223,124 +227,123 @@ void Client::close(bool passive) {
 }
 
 int32_t Client::subscribe(const char* name, uint32_t msgtype) {
-	shared_ptr<Connection> conn;
-
 	if (name == nullptr || !is_valid_msgtype(msgtype))
 		return FLORA_CLI_EINVAL;
-
-	cli_mutex.lock();
-	conn = connection;
-	cli_mutex.unlock();
-
-	if (conn.get() == nullptr)
-		return FLORA_CLI_ECONN;
 	int32_t c = RequestSerializer::serialize_subscribe(name, msgtype,
 			sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
+	cli_mutex.lock();
+	if (connection.get() == nullptr || !connection->send(sbuffer, c)) {
+		cli_mutex.unlock();
+		return FLORA_CLI_ECONN;
+	}
+	cli_mutex.unlock();
 #ifdef FLORA_DEBUG
 	++send_times;
 	send_bytes += c;
 #endif
-	if (!conn->send(sbuffer, c))
-		return FLORA_CLI_ECONN;
 	return FLORA_CLI_SUCCESS;
 }
 
 int32_t Client::unsubscribe(const char* name, uint32_t msgtype) {
-	shared_ptr<Connection> conn;
-
 	if (name == nullptr || !is_valid_msgtype(msgtype))
 		return FLORA_CLI_EINVAL;
-
-	cli_mutex.lock();
-	conn = connection;
-	cli_mutex.unlock();
-
-	if (conn.get() == nullptr)
-		return FLORA_CLI_ECONN;
 	int32_t c = RequestSerializer::serialize_unsubscribe(name, msgtype,
 			sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
+	cli_mutex.lock();
+	if (connection.get() == nullptr || !connection->send(sbuffer, c)) {
+		cli_mutex.unlock();
+		return FLORA_CLI_ECONN;
+	}
+	cli_mutex.unlock();
 #ifdef FLORA_DEBUG
 	++send_times;
 	send_bytes += c;
 #endif
-	if (!conn->send(sbuffer, c))
-		return FLORA_CLI_ECONN;
 	return FLORA_CLI_SUCCESS;
 }
 
 int32_t Client::post(const char* name, shared_ptr<Caps>& msg,
 		uint32_t msgtype) {
-	shared_ptr<Connection> conn;
-
 	if (name == nullptr || !is_valid_msgtype(msgtype)
 			|| msgtype == FLORA_MSGTYPE_REQUEST)
 		return FLORA_CLI_EINVAL;
-
-	cli_mutex.lock();
-	conn = connection;
-	cli_mutex.unlock();
-
-	if (conn.get() == nullptr)
-		return FLORA_CLI_ECONN;
 	int32_t c = RequestSerializer::serialize_post(name, msgtype, msg,
 			0, 0, sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
+	cli_mutex.lock();
+	if (connection.get() == nullptr || !connection->send(sbuffer, c)) {
+		cli_mutex.unlock();
+		return FLORA_CLI_ECONN;
+	}
+	cli_mutex.unlock();
 #ifdef FLORA_DEBUG
 	++post_times;
 	post_bytes += c;
 	++send_times;
 	send_bytes += c;
 #endif
-	if (!conn->send(sbuffer, c))
-		return FLORA_CLI_ECONN;
 	return FLORA_CLI_SUCCESS;
 }
 
 int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
 		vector<Reply>& replys, uint32_t timeout) {
-	shared_ptr<Connection> conn;
-
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
-
-	unique_lock<mutex> locker(cli_mutex);
-	conn = connection;
-	locker.unlock();
-
-	if (conn.get() == nullptr)
-		return FLORA_CLI_ECONN;
 	int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
 			msg, ++reqseq, timeout, sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
+	replys.clear();
+
+	unique_lock<mutex> locker(req_mutex);
+	PendingRequestList::iterator it = pending_requests.emplace(pending_requests.end());
+	(*it).id = reqseq;
+	(*it).results = &replys;
+	if (timeout == 0)
+		(*it).timeout = steady_clock::time_point::max();
+	else
+		(*it).timeout = steady_clock::now() + milliseconds(timeout);
+	cli_mutex.lock();
+	if (connection.get() == nullptr || !connection->send(sbuffer, c)) {
+		cli_mutex.unlock();
+		return FLORA_CLI_ECONN;
+	}
+	cli_mutex.unlock();
 #ifdef FLORA_DEBUG
 	++req_times;
 	req_bytes += c;
 	++send_times;
 	send_bytes += c;
 #endif
-	int32_t code = 0;
-	replys.clear();
-	locker.lock();
-	reply_results = &replys;
-	reply_code = &code;
-	if (!conn->send(sbuffer, c))
-		return FLORA_CLI_ECONN;
-	if (timeout == 0)
-		req_reply_cond.wait(locker);
-	else
-		req_reply_cond.wait_for(locker, milliseconds(timeout));
-	reply_results = nullptr;
-	reply_code = nullptr;
-	if (code)
-		return FLORA_CLI_ENEXISTS;
-	if (replys.empty())
-		return FLORA_CLI_ETIMEOUT;
+	while (true) {
+		if ((*it).timeout == steady_clock::time_point::max())
+			req_reply_cond.wait(locker);
+		else
+			req_reply_cond.wait_until(locker, (*it).timeout);
+
+		cli_mutex.lock();
+		if (connection.get() == nullptr) {
+			cli_mutex.unlock();
+			return FLORA_CLI_ECONN;
+		}
+		cli_mutex.unlock();
+
+		if ((*it).id < 0) {
+			// received reply
+			if (replys.empty())
+				return FLORA_CLI_ENEXISTS;
+			break;
+		} else {
+			// not receive reply
+			if ((*it).timeout <= steady_clock::now())
+				return FLORA_CLI_ETIMEOUT;
+		}
+	}
 	return FLORA_CLI_SUCCESS;
 }
 

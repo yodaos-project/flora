@@ -2,6 +2,11 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.2)
 project(flora)
 set(VERSION 0.1)
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
+	set(COMPILER_IS_CLANG TRUE)
+else()
+	set(COMPILER_IS_CLANG FALSE)
+endif()
 include (${CUSTOM_CMAKE_MODULES}/common.mk)
 
 option(BUILD_DEBUG "debug or release" OFF)
@@ -15,7 +20,10 @@ findPackage(mutils REQUIRED
 	STATIC_LIBS misc
 )
 
-set(CMAKE_CXX_FLAGS "-pthread -fPIC -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")
+if (NOT COMPILER_IS_CLANG)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+endif()
 if (BUILD_DEBUG)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -DFLORA_DEBUG")
 else()
