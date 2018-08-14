@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #include "tcp-conn.h"
 #include "rlog.h"
 
