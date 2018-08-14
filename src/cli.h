@@ -57,7 +57,6 @@ private:
 	int8_t* rbuffer = nullptr;
 	uint32_t rbuf_off = 0;
 	std::shared_ptr<Connection> connection;
-	std::thread recv_thread;
 	std::mutex cli_mutex;
 	std::mutex req_mutex;
 	std::condition_variable req_reply_cond;

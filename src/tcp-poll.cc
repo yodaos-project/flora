@@ -82,15 +82,16 @@ void TCPPoll::run() {
 				KLOGE(TAG, "accept failed: %s", strerror(errno));
 				continue;
 			}
-			if (new_fd >= max_fd) {
+			if (new_fd >= max_fd)
 				max_fd = new_fd + 1;
-				FD_SET(new_fd, &all_fds);
-			}
+			FD_SET(new_fd, &all_fds);
+			KLOGI(TAG, "accept new connection %d", new_fd);
 			new_adapter(new_fd);
 		}
 		// read
 		for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
 			if (FD_ISSET(adap_it->first, &rfds)) {
+				KLOGI(TAG, "read from fd %d", adap_it->first);
 				if (!read_from_client(adap_it->second)) {
 					pending_delete_adapters.push_back(adap_it->first);
 					FD_CLR(adap_it->first, &all_fds);

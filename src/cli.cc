@@ -74,7 +74,8 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 	callback = cb;
 	auth_extra = urip.fragment;
 
-	recv_thread = thread([this]() { this->recv_loop(); });
+	thread recv_thread([this]() { this->recv_loop(); });
+	recv_thread.detach();
 	return FLORA_CLI_SUCCESS;
 }
 
@@ -220,10 +221,6 @@ void Client::iclose(bool passive) {
 
 void Client::close(bool passive) {
 	iclose(passive);
-
-	if (recv_thread.joinable()) {
-		recv_thread.join();
-	}
 }
 
 int32_t Client::subscribe(const char* name, uint32_t msgtype) {
