@@ -106,8 +106,8 @@ void TCPPoll::run() {
 	}
 
 	// release resources
-	for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
-		delete_adapter(adap_it->first);
+	while (adapters.size() > 0) {
+		delete_adapter(adapters.begin()->first);
 	}
 }
 
