@@ -1,5 +1,6 @@
 #include "flora-svc.h"
 #include "tcp-poll.h"
+#include "unix-poll.h"
 #include "uri.h"
 
 using namespace std;
@@ -9,7 +10,10 @@ shared_ptr<flora::Poll> flora::Poll::new_instance(const char* uri) {
 	Uri urip;
 	if (!urip.parse(uri))
 		return nullptr;
-	if (urip.scheme == "tcp") {
+	if (urip.scheme == "unix") {
+		return static_pointer_cast<flora::Poll>(
+				make_shared<flora::internal::UnixPoll>(urip.path));
+	} else if (urip.scheme == "tcp") {
 		return static_pointer_cast<flora::Poll>(
 				make_shared<flora::internal::TCPPoll>(urip.host, urip.port));
 	}
@@ -22,7 +26,11 @@ int32_t flora_poll_new(const char* uri, flora_poll_t* result) {
 	Uri urip;
 	if (!urip.parse(uri))
 		return FLORA_POLL_INVAL;
-	if (urip.scheme == "tcp") {
+	if (urip.scheme == "unix") {
+		*result = reinterpret_cast<flora_poll_t>(
+				new flora::internal::UnixPoll(urip.path));
+		return FLORA_POLL_SUCCESS;
+	} else if (urip.scheme == "tcp") {
 		*result = reinterpret_cast<flora_poll_t>(
 				new flora::internal::TCPPoll(urip.host, urip.port));
 		return FLORA_POLL_SUCCESS;

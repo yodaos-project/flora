@@ -3,26 +3,26 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <string.h>
 #include <chrono>
 #include <vector>
 #include "flora-svc.h"
-#include "tcp-poll.h"
+#include "unix-poll.h"
 #include "rlog.h"
 
 using namespace std;
 
-#define TAG "flora.TCPPoll"
+#define TAG "flora.UnixPoll"
 
 namespace flora {
 namespace internal {
 
-TCPPoll::TCPPoll(const std::string& host, int32_t port) {
-	this->host = host;
-	this->port = port;
+UnixPoll::UnixPoll(const std::string& name) {
+	this->name = name;
 }
 
-int32_t TCPPoll::start(shared_ptr<flora::Dispatcher>& disp) {
+int32_t UnixPoll::start(shared_ptr<flora::Dispatcher>& disp) {
 	lock_guard<mutex> locker(start_mutex);
 	if (dispatcher.get())
 		return FLORA_POLL_ALREADY_START;
@@ -35,7 +35,7 @@ int32_t TCPPoll::start(shared_ptr<flora::Dispatcher>& disp) {
 	return FLORA_POLL_SUCCESS;
 }
 
-void TCPPoll::stop() {
+void UnixPoll::stop() {
 	unique_lock<mutex> locker(start_mutex);
 	if (dispatcher.get() == nullptr)
 		return;
@@ -47,10 +47,10 @@ void TCPPoll::stop() {
 	dispatcher.reset();
 }
 
-void TCPPoll::run() {
+void UnixPoll::run() {
 	fd_set all_fds;
 	fd_set rfds;
-	sockaddr_in addr;
+	sockaddr_un addr;
 	socklen_t addr_len;
 	int new_fd;
 	int max_fd;
@@ -111,24 +111,15 @@ void TCPPoll::run() {
 	}
 }
 
-bool TCPPoll::init_socket() {
-	int fd = socket(PF_INET, SOCK_STREAM, 0);
+bool UnixPoll::init_socket() {
+	int fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return false;
-	int v = 1;
-	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
-	struct sockaddr_in addr;
-	struct hostent* hp;
-	hp = gethostbyname(host.c_str());
-	if (hp == nullptr) {
-		KLOGE(TAG, "gethostbyname failed for host %s: %s", host.c_str(), strerror(errno));
-		::close(fd);
-		return false;
-	}
+	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	memcpy(&addr.sin_addr, hp->h_addr_list[0], sizeof(addr.sin_addr));
-	addr.sin_port = htons(port);
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, name.c_str());
+	unlink(name.c_str());
 	if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
 		::close(fd);
 		KLOGE(TAG, "socket bind failed: %s", strerror(errno));
@@ -139,12 +130,12 @@ bool TCPPoll::init_socket() {
 	return true;
 }
 
-void TCPPoll::new_adapter(int fd) {
+void UnixPoll::new_adapter(int fd) {
 	shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd, max_msg_size);
 	adapters.insert(make_pair(fd, adap));
 }
 
-void TCPPoll::delete_adapter(int fd) {
+void UnixPoll::delete_adapter(int fd) {
 	AdapterMap::iterator it = adapters.find(fd);
 	if (it != adapters.end()) {
 		::close(fd);
@@ -153,7 +144,7 @@ void TCPPoll::delete_adapter(int fd) {
 	}
 }
 
-bool TCPPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
+bool UnixPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
 	int32_t r = adap->read();
 	if (r != SOCK_ADAPTER_SUCCESS)
 		return false;

@@ -16,9 +16,9 @@ typedef std::map<int, std::shared_ptr<SocketAdapter> > AdapterMap;
 namespace flora {
 namespace internal {
 
-class TCPPoll : public flora::Poll {
+class UnixPoll : public flora::Poll {
 public:
-	TCPPoll(const std::string& host, int32_t port);
+	UnixPoll(const std::string& name);
 
 	int32_t start(std::shared_ptr<flora::Dispatcher>& disp);
 
@@ -42,8 +42,7 @@ private:
 	std::thread run_thread;
 	std::mutex start_mutex;
 	AdapterMap adapters;
-	std::string host;
-	int32_t port;
+	std::string name;
 };
 
 } // namespace internal

@@ -4,21 +4,21 @@
 
 #define HEADER_SIZE 8
 
-#define TCP_ADAPTER_SUCCESS 0
+#define SOCK_ADAPTER_SUCCESS 0
 // socket已关闭或出错
-#define TCP_ADAPTER_ECLOSED -10001
+#define SOCK_ADAPTER_ECLOSED -10001
 // 读取的数据不足
-#define TCP_ADAPTER_ENOMORE -10002
+#define SOCK_ADAPTER_ENOMORE -10002
 // 数据协议格式错误
-#define TCP_ADAPTER_EPROTO -10003
+#define SOCK_ADAPTER_EPROTO -10003
 // buf空间不足
-#define TCP_ADAPTER_ENOBUF -10004
+#define SOCK_ADAPTER_ENOBUF -10004
 
-class TCPAdapter : public Adapter {
+class SocketAdapter : public Adapter {
 public:
-	TCPAdapter(int sock, uint32_t bufsize);
+	SocketAdapter(int sock, uint32_t bufsize);
 
-	~TCPAdapter();
+	~SocketAdapter();
 
 	// return:  = 0   success
 	//          < 0   error

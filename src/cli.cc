@@ -5,6 +5,7 @@
 #include "uri.h"
 #include "rlog.h"
 #include "tcp-conn.h"
+#include "unix-conn.h"
 #include "ser-helper.h"
 #include "defs.h"
 
@@ -56,17 +57,25 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 		KLOGE(TAG, "invalid uri %s", uri);
 		return FLORA_CLI_EINVAL;
 	}
+	KLOGI(TAG, "uri parse: path = %s", urip.path.c_str());
+	KLOGI(TAG, "uri parse: fragment = %s", urip.fragment.c_str());
 
-	TCPConn* conn;
-	if (urip.scheme == "tcp") {
+	if (urip.scheme == "unix") {
+		UnixConn* conn;
+		conn = new UnixConn();
+		if (!conn->connect(urip.path))
+			return FLORA_CLI_ECONN;
+		connection.reset(conn);
+	} else if (urip.scheme == "tcp") {
+		TCPConn* conn;
 		conn = new TCPConn();
 		if (!conn->connect(urip.host, urip.port))
 			return FLORA_CLI_ECONN;
+		connection.reset(conn);
 	} else {
 		KLOGE(TAG, "unsupported uri scheme %s", urip.scheme.c_str());
 		return FLORA_CLI_EINVAL;
 	}
-	connection.reset(conn);
 	if (!auth(urip.fragment)) {
 		close(false);
 		return FLORA_CLI_EAUTH;

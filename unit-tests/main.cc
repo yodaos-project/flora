@@ -9,8 +9,13 @@
 #include "test-svc.h"
 
 #define TAG "unit-test.main"
-#define SERVICE_URI "tcp://0.0.0.0:37777/"
-#define CONN_URI "tcp://localhost:37777/"
+
+#define TCP_SERVICE_URI "tcp://0.0.0.0:37777/"
+#define TCP_CONN_URI "tcp://localhost:37777/"
+#define UNIX_URI "unix:flora-unittest"
+
+#define COMM_TYPE_UNIX 0
+#define COMM_TYPE_TCP 1
 
 static void print_prompt(const char* progname) {
 	static const char* format =
@@ -18,6 +23,7 @@ static void print_prompt(const char* progname) {
 		"options:\n"
 		"--client-num=$TEST_CLIENT_NUM  (default value 2)\n"
 		"--repeat=$TEST_REPEAT_TIMES  (default value 1)\n"
+		"--comm-type=$TYPE  (unix|tcp)  (default value unix)\n"
 		"--use-c-api\n";
 	KLOGE(TAG, format, progname);
 }
@@ -25,6 +31,7 @@ static void print_prompt(const char* progname) {
 typedef struct {
 	int32_t client_num;
 	int32_t repeat;
+	int32_t comm_type;
 	int32_t use_c_api;
 } CmdlineArgs;
 
@@ -61,6 +68,15 @@ static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
 			clargs_destroy(h);
 			return false;
 		}
+	}
+	v = clargs_opt_get(h, "comm-type");
+	if (v == nullptr) {
+		args->comm_type = COMM_TYPE_UNIX;
+	} else {
+		if (strcmp(v, "tcp") == 0)
+			args->comm_type = COMM_TYPE_TCP;
+		else
+			args->comm_type = COMM_TYPE_UNIX;
 	}
 	if (clargs_opt_has(h, "use-c-api"))
 		args->use_c_api = 1;
@@ -138,7 +154,12 @@ int main(int argc, char** argv) {
 	TestClient::static_init(args.use_c_api);
 
 	TestService tsvc;
-	if (!tsvc.run(SERVICE_URI, args.use_c_api)) {
+	const char* uri;
+	if (args.comm_type == COMM_TYPE_TCP)
+		uri = TCP_SERVICE_URI;
+	else
+		uri = UNIX_URI;
+	if (!tsvc.run(uri, args.use_c_api)) {
 		KLOGE(TAG, "service startup failed");
 		return 1;
 	}
@@ -147,8 +168,12 @@ int main(int argc, char** argv) {
 	int32_t i;
 
 	char cli_uri[64];
+	if (args.comm_type == COMM_TYPE_TCP)
+		uri = TCP_CONN_URI;
+	else
+		uri = UNIX_URI;
 	for (i = 0; i < args.client_num; ++i) {
-		snprintf(cli_uri, sizeof(cli_uri), "%s#%03d", CONN_URI, i);
+		snprintf(cli_uri, sizeof(cli_uri), "%s#%03d", uri, i);
 		if (!clients[i].init(cli_uri, args.use_c_api)) {
 			KLOGE(TAG, "client %d init failed", i);
 			tsvc.close();
