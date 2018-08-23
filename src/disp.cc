@@ -99,6 +99,9 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
 
 	if (msgtype == FLORA_MSGTYPE_PERSIST) {
 		PersistMsgMap::iterator it = persist_msgs.find(name);
+		KLOGI(TAG, "client %s subscribe persist msg %s: %s",
+				sender->auth_extra.c_str(), name.c_str(),
+				it == persist_msgs.end() ? "not exists" : "exists");
 		if (it != persist_msgs.end()) {
 			int32_t c = ResponseSerializer::serialize_post(name.c_str(),
 					msgtype, it->second.data, 0, buffer, buf_size);
@@ -156,24 +159,19 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
 	SubscriptionMap& submap = subscriptions[msgtype];
 	SubscriptionMap::iterator sit;
 	int32_t svrid = 0;
+	bool has_subscription = true;
 
 	sit = submap.find(name);
-	if (msgtype == FLORA_MSGTYPE_REQUEST) {
+	if (sit == submap.end() || sit->second.empty())
+		has_subscription = false;
+	if (msgtype == FLORA_MSGTYPE_REQUEST)
 		svrid = ++reqseq;
-	} else {
-		if (sit == submap.end()) {
-			return true;
-		}
-		if (sit->second.empty()) {
-			return true;
-		}
-	}
-	int32_t c = ResponseSerializer::serialize_post(name.c_str(), msgtype,
-			args, svrid, buffer, buf_size);
-	if (c < 0)
-		return false;
-	AdapterList::iterator ait;
-	if (sit != submap.end()) {
+	if (has_subscription) {
+		int32_t c = ResponseSerializer::serialize_post(name.c_str(), msgtype,
+				args, svrid, buffer, buf_size);
+		if (c < 0)
+			return false;
+		AdapterList::iterator ait;
 		ait = sit->second.begin();
 		while (ait != sit->second.end()) {
 			if ((*ait)->closed()) {
@@ -202,10 +200,10 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
 				sender->auth_extra.c_str(), name.c_str(), timeout);
 #endif
 		static AdapterList empty_adapter_list;
-		if (sit == submap.end())
-			reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, empty_adapter_list);
-		else
+		if (has_subscription)
 			reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, sit->second);
+		else
+			reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, empty_adapter_list);
 	}
 	return true;
 }
