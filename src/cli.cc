@@ -170,6 +170,10 @@ bool Client::handle_received(int32_t size) {
 								buf_size);
 						if (!connection->send(sbuffer, c))
 							return false;
+#ifdef FLORA_DEBUG
+						send_bytes += c;
+						++send_times;
+#endif
 					} else {
 						callback->recv_post(name.c_str(), msgtype, args);
 					}
