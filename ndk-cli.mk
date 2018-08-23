@@ -11,6 +11,8 @@ LOCAL_SRC_FILES := \
 	src/conn.h \
 	src/tcp-conn.h \
 	src/tcp-conn.cc \
+	src/unix-conn.h \
+	src/unix-conn.cc \
 	src/defs.h \
 	src/ser-helper.h \
 	src/ser-helper.cc

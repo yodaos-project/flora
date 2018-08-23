@@ -9,11 +9,13 @@ LOCAL_SRC_FILES := \
 	include/flora-cli.h \
 	src/defs.h \
 	src/adap.h \
-	src/tcp-adap.h \
-	src/tcp-adap.cc \
+	src/sock-adap.h \
+	src/sock-adap.cc \
 	src/poll.cc \
 	src/tcp-poll.h \
 	src/tcp-poll.cc \
+	src/unix-poll.h \
+	src/unix-poll.cc \
 	src/disp.h \
 	src/disp.cc \
 	src/reply-mgr.h \
