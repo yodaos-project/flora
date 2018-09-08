@@ -15,20 +15,20 @@ namespace flora {
 
 class Dispatcher {
 public:
-	virtual ~Dispatcher() = default;
+  virtual ~Dispatcher() = default;
 
-	static std::shared_ptr<Dispatcher> new_instance(uint32_t msg_buf_size = 0);
+  static std::shared_ptr<Dispatcher> new_instance(uint32_t msg_buf_size = 0);
 };
 
 class Poll {
 public:
-	virtual ~Poll() = default;
+  virtual ~Poll() = default;
 
-	virtual int32_t start(std::shared_ptr<Dispatcher>& dispathcer) = 0;
+  virtual int32_t start(std::shared_ptr<Dispatcher>& dispathcer) = 0;
 
-	virtual void stop() = 0;
+  virtual void stop() = 0;
 
-	static std::shared_ptr<Poll> new_instance(const char* uri);
+  static std::shared_ptr<Poll> new_instance(const char* uri);
 };
 
 } // namespace flora

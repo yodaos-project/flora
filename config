@@ -8,7 +8,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
 Configuration:
     --help                      display this help and exit
     --debug                     build for debug
-    --test                build unit-tests
+    --test                      build unit-tests
     --build-dir=DIR             build directory
     --prefix=PREFIX             install prefix
     --cmake-modules=DIR         directory of cmake modules file exist

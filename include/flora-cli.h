@@ -27,44 +27,44 @@
 namespace flora {
 
 typedef struct {
-	int32_t ret_code;
-	std::shared_ptr<Caps> data;
-	std::string extra;
+  int32_t ret_code;
+  std::shared_ptr<Caps> data;
+  std::string extra;
 } Reply;
 
 class ClientCallback;
 
 class Client {
 public:
-	virtual ~Client() = default;
+  virtual ~Client() = default;
 
-	virtual int32_t subscribe(const char* name, uint32_t msgtype) = 0;
+  virtual int32_t subscribe(const char* name, uint32_t msgtype) = 0;
 
-	virtual int32_t unsubscribe(const char* name, uint32_t msgtype) = 0;
+  virtual int32_t unsubscribe(const char* name, uint32_t msgtype) = 0;
 
-	virtual int32_t post(const char* name, std::shared_ptr<Caps>& msg,
-			uint32_t msgtype) = 0;
+  virtual int32_t post(const char* name, std::shared_ptr<Caps>& msg,
+      uint32_t msgtype) = 0;
 
-	virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-			std::vector<Reply>& replys, uint32_t timeout = 0) = 0;
+  virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::vector<Reply>& replys, uint32_t timeout = 0) = 0;
 
-	static int32_t connect(const char* uri, ClientCallback* cb,
-			uint32_t msg_buf_size, std::shared_ptr<Client>& result);
+  static int32_t connect(const char* uri, ClientCallback* cb,
+      uint32_t msg_buf_size, std::shared_ptr<Client>& result);
 };
 
 class ClientCallback {
 public:
-	virtual ~ClientCallback() = default;
+  virtual ~ClientCallback() = default;
 
-	virtual void recv_post(const char* name, uint32_t msgtype,
-			std::shared_ptr<Caps>& msg) {}
+  virtual void recv_post(const char* name, uint32_t msgtype,
+      std::shared_ptr<Caps>& msg) {}
 
-	virtual int32_t recv_get(const char* name, std::shared_ptr<Caps>& msg,
-			std::shared_ptr<Caps>& reply) {
-		return FLORA_CLI_SUCCESS;
-	}
+  virtual int32_t recv_get(const char* name, std::shared_ptr<Caps>& msg,
+      std::shared_ptr<Caps>& reply) {
+    return FLORA_CLI_SUCCESS;
+  }
 
-	virtual void disconnected() {}
+  virtual void disconnected() {}
 };
 
 } // namespace flora
@@ -85,18 +85,18 @@ typedef void (*flora_cli_recv_post_func_t)(const char* name, uint32_t msgtype, c
 //     其它,  返回值为自定义错误码，客户端将把此错误码发回给'get'请求发送端
 typedef int32_t (*flora_cli_recv_get_func_t)(const char* name, caps_t msg, void* arg, caps_t* resp);
 typedef struct {
-	flora_cli_recv_post_func_t recv_post;
-	flora_cli_recv_get_func_t recv_get;
-	flora_cli_disconnected_func_t disconnected;
+  flora_cli_recv_post_func_t recv_post;
+  flora_cli_recv_get_func_t recv_get;
+  flora_cli_disconnected_func_t disconnected;
 } flora_cli_callback_t;
 typedef struct {
-	// FLORA_CLI_SUCCESS: 成功
-	// 其它: 此请求服务端自定义错误码
-	int32_t ret_code;
-	caps_t data;
-	// 回应请求的服务端自定义标识
-	// 可能为空字串
-	char* extra;
+  // FLORA_CLI_SUCCESS: 成功
+  // 其它: 此请求服务端自定义错误码
+  int32_t ret_code;
+  caps_t data;
+  // 回应请求的服务端自定义标识
+  // 可能为空字串
+  char* extra;
 } flora_get_result;
 
 // uri: 支持的schema:
@@ -106,8 +106,8 @@ typedef struct {
 // async: 异步模式开关
 // result: 返回flora_cli_t对象
 int32_t flora_cli_connect(const char* uri, /*int32_t async,*/
-		flora_cli_callback_t* callback, void* arg,
-		uint32_t msg_buf_size, flora_cli_t* result);
+    flora_cli_callback_t* callback, void* arg,
+    uint32_t msg_buf_size, flora_cli_t* result);
 
 void flora_cli_delete(flora_cli_t handle);
 
@@ -122,7 +122,7 @@ int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_
 
 // send REQUEST msg and recv results
 int32_t flora_cli_get(flora_cli_t handle, const char* name, caps_t msg,
-		flora_get_result** results, uint32_t* res_buf_size, uint32_t timeout);
+    flora_get_result** results, uint32_t* res_buf_size, uint32_t timeout);
 
 void flora_result_delete(flora_get_result* results, uint32_t size);
 

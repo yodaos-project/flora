@@ -5,14 +5,14 @@
 
 class TCPConn : public Connection {
 public:
-	bool connect(const std::string& host, int32_t port);
+  bool connect(const std::string& host, int32_t port);
 
-	bool send(const void* data, uint32_t size);
+  bool send(const void* data, uint32_t size);
 
-	int32_t recv(void* data, uint32_t size);
+  int32_t recv(void* data, uint32_t size);
 
-	void close();
+  void close();
 
 private:
-	int sock = -1;
+  int sock = -1;
 };
