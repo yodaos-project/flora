@@ -49,12 +49,20 @@ bool UnixConn::send(const void* data, uint32_t size) {
 int32_t UnixConn::recv(void* data, uint32_t size) {
   if (sock < 0)
     return -1;
-  ssize_t c = ::read(sock, data, size);
-  if (c < 0) {
-    KLOGE(TAG, "read socket failed: %s", strerror(errno));
-  } else if (c == 0) {
-    KLOGE(TAG, "read socket failed: remote closed");
-  }
+  ssize_t c;
+  do {
+    c = ::read(sock, data, size);
+    if (c < 0) {
+      if (errno == EINTR) {
+        KLOGE(TAG, "read socket failed: %s", strerror(errno));
+        continue;
+      }
+      KLOGE(TAG, "read socket failed: %s", strerror(errno));
+    } else if (c == 0) {
+      KLOGE(TAG, "read socket failed: remote closed");
+    }
+    break;
+  } while (true);
   return c;
 }
 
