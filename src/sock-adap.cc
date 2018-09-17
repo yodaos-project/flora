@@ -73,8 +73,10 @@ nomore:
 }
 
 void SocketAdapter::close() {
-  munmap(buffer, buf_size);
-  buffer = nullptr;
+  if (buffer) {
+    munmap(buffer, buf_size);
+    buffer = nullptr;
+  }
 }
 
 bool SocketAdapter::closed() const {
