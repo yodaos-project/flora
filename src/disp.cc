@@ -47,9 +47,11 @@ bool Dispatcher::put(Frame& frame, shared_ptr<Adapter>& sender) {
 
   int32_t cmd;
   if (msg_caps->read(cmd) != CAPS_SUCCESS) {
+    KLOGE(TAG, "read msg cmd failed");
     return false;
   }
   if (cmd < 0 || cmd >= MSG_HANDLER_COUNT) {
+    KLOGE(TAG, "msg cmd invalid: %d", cmd);
     return false;
   }
   return (this->*(msg_handlers[cmd]))(msg_caps, sender);

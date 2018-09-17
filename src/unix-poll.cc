@@ -73,6 +73,7 @@ void UnixPoll::run() {
     }
     // closed
     if (listen_fd < 0) {
+      KLOGI(TAG, "listen fd = %d, unix poll quit", listen_fd);
       break;
     }
     // accept new connection
@@ -92,7 +93,9 @@ void UnixPoll::run() {
     // read
     for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
       if (FD_ISSET(adap_it->first, &rfds)) {
+#ifdef FLORA_DEBUG
         KLOGI(TAG, "read from fd %d", adap_it->first);
+#endif
         if (!read_from_client(adap_it->second)) {
           pending_delete_adapters.push_back(adap_it->first);
           FD_CLR(adap_it->first, &all_fds);
@@ -109,6 +112,7 @@ void UnixPoll::run() {
   while (adapters.size() > 0) {
     delete_adapter(adapters.begin()->first);
   }
+  KLOGI(TAG, "unix poll: run thread quit");
 }
 
 bool UnixPoll::init_socket() {
@@ -154,11 +158,14 @@ bool UnixPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
     r = adap->next_frame(frame);
     if (r == SOCK_ADAPTER_SUCCESS) {
       shared_ptr<Adapter> a = static_pointer_cast<Adapter>(adap);
-      if (!dispatcher->put(frame, a))
+      if (!dispatcher->put(frame, a)) {
+        KLOGE(TAG, "dispatcher put failed");
         return false;
+      }
     } else if (r == SOCK_ADAPTER_ENOMORE) {
       break;
     } else {
+      KLOGE(TAG, "adapter next frame return %d", r);
       return false;
     }
   }
