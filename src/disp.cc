@@ -54,7 +54,14 @@ bool Dispatcher::put(Frame& frame, shared_ptr<Adapter>& sender) {
     KLOGE(TAG, "msg cmd invalid: %d", cmd);
     return false;
   }
-  return (this->*(msg_handlers[cmd]))(msg_caps, sender);
+#ifdef FLORA_DEBUG2
+  KLOGI(TAG, "Dispatcher.put: before msg handler, cmd %d", cmd);
+#endif
+  bool r = (this->*(msg_handlers[cmd]))(msg_caps, sender);
+#ifdef FLORA_DEBUG2
+  KLOGI(TAG, "Dispatcher.put: after msg handler, result %d", r);
+#endif
+  return r;
 }
 
 bool Dispatcher::handle_auth_req(shared_ptr<Caps>& msg_caps,

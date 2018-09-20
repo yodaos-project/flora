@@ -86,8 +86,14 @@ bool SocketAdapter::closed() const {
 void SocketAdapter::write(const void* data, uint32_t size) {
   if (buffer == nullptr)
     return;
+#ifdef FLORA_DEBUG2
+  KLOGI(TAG, "before socket write, %u bytes", size);
+#endif
   if (::write(socket, data, size) < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
     close();
   }
+#ifdef FLORA_DEBUG2
+  KLOGI(TAG, "after socket write, %u bytes");
+#endif
 }
