@@ -73,6 +73,7 @@ target_link_libraries(flora-svc
 
 set(flora_cli_SOURCES
   include/flora-cli.h
+  include/flora-agent.h
   src/cli.h
   src/cli.cc
   src/conn.h
@@ -83,6 +84,7 @@ set(flora_cli_SOURCES
   src/defs.h
   src/ser-helper.h
   src/ser-helper.cc
+  src/flora-agent.cc
 )
 add_library(flora-cli SHARED
   ${flora_cli_SOURCES}
