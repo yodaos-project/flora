@@ -64,12 +64,6 @@ FLORA_CLI_EINVAL
 订阅的消息名称
 ```
 
-* 参数  uint32_t msgtype  消息类型(详见c++接口文档)
-
-```
-订阅的消息类型
-```
-
 **\[\[unsubscribe]]**
 
 取消订阅
@@ -84,8 +78,6 @@ FLORA_CLI_EINVAL
 * 参数  flora\_cli\_t handle
 
 * 参数  const char* name
-
-* 参数  uint32_t msgtype  消息类型(详见c++接口文档)
 
 **\[\[flora\_cli\_post]]**
 
@@ -222,7 +214,7 @@ flora_cli_t cli;
 if (flora_cli_connect("tcp://localhost:5678/#foo1", &cb, cb_arg, 0, &cli) != FLORA_CLI_SUCCESS) {
   // TODO: 错误处理
 }
-flora_cli_subscribe(cli, "hello", FLORA_MSGTYPE_INSTANT);
+flora_cli_subscribe(cli, "hello");
 // ...订阅其它消息...
 caps_t msg = caps_create();
 // ... write some data to 'msg' ...
