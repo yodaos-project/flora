@@ -237,10 +237,10 @@ void Client::close(bool passive) {
     recv_thread.join();
 }
 
-int32_t Client::subscribe(const char* name, uint32_t msgtype) {
-	if (name == nullptr || !is_valid_msgtype(msgtype))
+int32_t Client::subscribe(const char* name) {
+	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
-	int32_t c = RequestSerializer::serialize_subscribe(name, msgtype,
+	int32_t c = RequestSerializer::serialize_subscribe(name,
 			sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
@@ -257,10 +257,10 @@ int32_t Client::subscribe(const char* name, uint32_t msgtype) {
 	return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::unsubscribe(const char* name, uint32_t msgtype) {
-	if (name == nullptr || !is_valid_msgtype(msgtype))
+int32_t Client::unsubscribe(const char* name) {
+	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
-	int32_t c = RequestSerializer::serialize_unsubscribe(name, msgtype,
+	int32_t c = RequestSerializer::serialize_unsubscribe(name,
 			sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
@@ -442,16 +442,16 @@ void flora_cli_delete(flora_cli_t handle) {
 	}
 }
 
-int32_t flora_cli_subscribe(flora_cli_t handle, const char* name, uint32_t msgtype) {
+int32_t flora_cli_subscribe(flora_cli_t handle, const char* name) {
 	if (handle == 0)
 		return FLORA_CLI_EINVAL;
-	return reinterpret_cast<Client*>(handle)->subscribe(name, msgtype);
+	return reinterpret_cast<Client*>(handle)->subscribe(name);
 }
 
-int32_t flora_cli_unsubscribe(flora_cli_t handle, const char* name, uint32_t msgtype) {
+int32_t flora_cli_unsubscribe(flora_cli_t handle, const char* name) {
 	if (handle == 0)
 		return FLORA_CLI_EINVAL;
-	return reinterpret_cast<Client*>(handle)->unsubscribe(name, msgtype);
+	return reinterpret_cast<Client*>(handle)->unsubscribe(name);
 }
 
 int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_t msgtype) {

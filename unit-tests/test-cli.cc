@@ -59,7 +59,7 @@ void TestClient::do_subscribe() {
 	int32_t c = rand() % FLORA_MSG_COUNT;
 	int32_t i;
 	int32_t idx;
-	int32_t r[3];
+	int32_t r;
 
 	memset(recv_instant_counter, 0, sizeof(recv_instant_counter));
 	memset(recv_persist_counter, 0, sizeof(recv_persist_counter));
@@ -69,29 +69,15 @@ void TestClient::do_subscribe() {
 		idx = rand() % FLORA_MSG_COUNT;
 		if (subscribe_flags[idx] == 0) {
 			if (use_c_api) {
-				r[0] = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name,
-							FLORA_MSGTYPE_INSTANT);
-				r[1] = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name,
-							FLORA_MSGTYPE_PERSIST);
-				r[2] = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name,
-							FLORA_MSGTYPE_REQUEST);
+				r = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name);
 			} else {
-				r[0] = flora_cli->subscribe(flora_msgs[idx].name,
-						FLORA_MSGTYPE_INSTANT);
-				r[1] = flora_cli->subscribe(flora_msgs[idx].name,
-						FLORA_MSGTYPE_PERSIST);
-				r[2] = flora_cli->subscribe(flora_msgs[idx].name,
-						FLORA_MSGTYPE_REQUEST);
+				r = flora_cli->subscribe(flora_msgs[idx].name);
 			}
 
-			if (r[0] != FLORA_CLI_SUCCESS)
-				KLOGE(TAG, "client instant subscribe failed");
+			if (r != FLORA_CLI_SUCCESS)
+				KLOGE(TAG, "client subscribe failed");
 			else
 				subscribe_flags[idx] = 1;
-			if (r[1] != FLORA_CLI_SUCCESS)
-				KLOGE(TAG, "client persist subscribe failed");
-			if (r[2] != FLORA_CLI_SUCCESS)
-				KLOGE(TAG, "client request subscribe failed");
 		}
 	}
 }
@@ -143,30 +129,16 @@ void TestClient::do_post() {
 
 void TestClient::reset() {
 	int32_t i;
-	int32_t r[3];
+	int32_t r;
 
 	for (i = 0; i < FLORA_MSG_COUNT; ++i) {
 		if (use_c_api) {
-			r[0] = flora_cli_unsubscribe(c_flora_cli, flora_msgs[i].name,
-						FLORA_MSGTYPE_INSTANT);
-			r[1] = flora_cli_unsubscribe(c_flora_cli, flora_msgs[i].name,
-						FLORA_MSGTYPE_PERSIST);
-			r[2] = flora_cli_unsubscribe(c_flora_cli, flora_msgs[i].name,
-						FLORA_MSGTYPE_REQUEST);
+			r = flora_cli_unsubscribe(c_flora_cli, flora_msgs[i].name);
 		} else {
-			r[0] = flora_cli->unsubscribe(flora_msgs[i].name,
-					FLORA_MSGTYPE_INSTANT);
-			r[1] = flora_cli->unsubscribe(flora_msgs[i].name,
-					FLORA_MSGTYPE_PERSIST);
-			r[2] = flora_cli->unsubscribe(flora_msgs[i].name,
-					FLORA_MSGTYPE_REQUEST);
+			r = flora_cli->unsubscribe(flora_msgs[i].name);
 		}
-		if (r[0] != FLORA_CLI_SUCCESS)
-			KLOGE(TAG, "client instant unsubscribe failed");
-		if (r[1] != FLORA_CLI_SUCCESS)
-			KLOGE(TAG, "client persist unsubscribe failed");
-		if (r[2] != FLORA_CLI_SUCCESS)
-			KLOGE(TAG, "client request unsubscribe failed");
+		if (r != FLORA_CLI_SUCCESS)
+			KLOGE(TAG, "client unsubscribe failed");
 	}
 	memset(subscribe_flags, 0, sizeof(subscribe_flags));
 	memset(post_counter, 0, sizeof(post_counter));

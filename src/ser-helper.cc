@@ -21,10 +21,9 @@ int32_t RequestSerializer::serialize_auth(uint32_t version,
 }
 
 int32_t RequestSerializer::serialize_subscribe(const char* name,
-    uint32_t msgtype, void* data, uint32_t size) {
+    void* data, uint32_t size) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_SUBSCRIBE_REQ);
-  caps->write((int32_t)msgtype);
   caps->write(name);
   int32_t r = caps->serialize(data, size);
   if (r < 0)
@@ -35,10 +34,9 @@ int32_t RequestSerializer::serialize_subscribe(const char* name,
 }
 
 int32_t RequestSerializer::serialize_unsubscribe(const char* name,
-    uint32_t msgtype, void* data, uint32_t size) {
+    void* data, uint32_t size) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_UNSUBSCRIBE_REQ);
-  caps->write((int32_t)msgtype);
   caps->write(name);
   int32_t r = caps->serialize(data, size);
   if (r < 0)
@@ -147,22 +145,15 @@ int32_t RequestParser::parse_auth(shared_ptr<Caps>& caps,
 }
 
 int32_t RequestParser::parse_subscribe(shared_ptr<Caps>& caps,
-    string& name, uint32_t& msgtype) {
+    string& name) {
   int32_t v;
-  if (caps->read(v) != CAPS_SUCCESS)
-    return -1;
-  msgtype = v;
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
 int32_t RequestParser::parse_unsubscribe(shared_ptr<Caps>& caps,
-    string& name, uint32_t& msgtype) {
-  int32_t v;
-  if (caps->read(v) != CAPS_SUCCESS)
-    return -1;
-  msgtype = v;
+    string& name) {
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;

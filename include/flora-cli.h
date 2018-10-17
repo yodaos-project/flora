@@ -38,9 +38,9 @@ class Client {
 public:
   virtual ~Client() = default;
 
-  virtual int32_t subscribe(const char* name, uint32_t msgtype) = 0;
+  virtual int32_t subscribe(const char* name) = 0;
 
-  virtual int32_t unsubscribe(const char* name, uint32_t msgtype) = 0;
+  virtual int32_t unsubscribe(const char* name) = 0;
 
   virtual int32_t post(const char* name, std::shared_ptr<Caps>& msg,
       uint32_t msgtype) = 0;
@@ -112,10 +112,10 @@ int32_t flora_cli_connect(const char* uri, /*int32_t async,*/
 void flora_cli_delete(flora_cli_t handle);
 
 // msgtype: INSTANT | PERSIST | REQUEST
-int32_t flora_cli_subscribe(flora_cli_t handle, const char* name, uint32_t msgtype);
+int32_t flora_cli_subscribe(flora_cli_t handle, const char* name);
 
 // msgtype: INSTANT | PERSIST | REQUEST
-int32_t flora_cli_unsubscribe(flora_cli_t handle, const char* name, uint32_t msgtype);
+int32_t flora_cli_unsubscribe(flora_cli_t handle, const char* name);
 
 // msgtype: INSTANT | PERSIST
 int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_t msgtype);

@@ -45,7 +45,7 @@ private:
       std::shared_ptr<Adapter>& sender);
 
 private:
-  SubscriptionMap subscriptions[FLORA_NUMBER_OF_MSGTYPE];
+  SubscriptionMap subscriptions;
   PersistMsgMap persist_msgs;
   int8_t* buffer;
   uint32_t buf_size;

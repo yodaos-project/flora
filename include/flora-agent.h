@@ -25,32 +25,16 @@ enum class AgentConfigKey {
   RECONN_INTERVAL
 };
 
-typedef struct {
-  std::string name;
-  uint32_t type;
-} MsgId;
-
-class MsgCompare {
-public:
-  bool operator()(const MsgId& lhs, const MsgId& rhs) const {
-    if (lhs.name < rhs.name)
-      return true;
-    if (lhs.name == rhs.name)
-      return lhs.type < rhs.type;
-    return false;
-  }
-};
-
-typedef std::map<MsgId,
-        std::function<void(std::shared_ptr<Caps>&)>,
-        MsgCompare> MsgHandlerMap;
+typedef std::map<std::string,
+          std::function<void(std::shared_ptr<Caps>&, uint32_t)>
+        > MsgHandlerMap;
 
 class Agent : public ClientCallback {
 public:
   void config(AgentConfigKey key, ...);
 
-  void subscribe(const char* name, uint32_t msgtype,
-      std::function<void(std::shared_ptr<Caps>&)>& cb);
+  void subscribe(const char* name,
+      std::function<void(std::shared_ptr<Caps>&, uint32_t)>& cb);
 
   void start(bool block = false);
 

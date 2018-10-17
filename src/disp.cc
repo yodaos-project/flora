@@ -29,10 +29,7 @@ Dispatcher::Dispatcher(uint32_t bufsize) : reply_mgr(bufsize) {
 }
 
 Dispatcher::~Dispatcher() noexcept {
-  int32_t i;
-  for (i = 0; i < FLORA_NUMBER_OF_MSGTYPE; ++i) {
-    subscriptions[i].clear();
-  }
+  subscriptions.clear();
   munmap(buffer, buf_size);
 }
 
@@ -81,17 +78,13 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps>& msg_caps,
 
 bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
     shared_ptr<Adapter>& sender) {
-  uint32_t msgtype;
   string name;
 
-  if (RequestParser::parse_subscribe(msg_caps, name, msgtype) != 0)
-    return false;
-  if (!is_valid_msgtype(msgtype))
+  if (RequestParser::parse_subscribe(msg_caps, name) != 0)
     return false;
   if (name.length() == 0)
     return false;
-  SubscriptionMap& submap = subscriptions[msgtype];
-  AdapterList& adapters = submap[name];
+  AdapterList& adapters = subscriptions[name];
   AdapterList::iterator it;
   for (it = adapters.begin(); it != adapters.end(); ++it) {
     if ((*it).get() == sender.get())
@@ -99,17 +92,15 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
   }
   adapters.push_back(sender);
 
-  if (msgtype == FLORA_MSGTYPE_PERSIST) {
-    PersistMsgMap::iterator it = persist_msgs.find(name);
-    KLOGI(TAG, "client %s subscribe persist msg %s: %s",
-        sender->auth_extra.c_str(), name.c_str(),
-        it == persist_msgs.end() ? "not exists" : "exists");
-    if (it != persist_msgs.end()) {
-      int32_t c = ResponseSerializer::serialize_post(name.c_str(),
-          msgtype, it->second.data, 0, buffer, buf_size);
-      if (c > 0) {
-        sender->write(buffer, c);
-      }
+  // post persist messge to client
+  PersistMsgMap::iterator pit = persist_msgs.find(name);
+  if (pit != persist_msgs.end()) {
+    int32_t c = ResponseSerializer::serialize_post(name.c_str(),
+        FLORA_MSGTYPE_PERSIST, pit->second.data, 0, buffer, buf_size);
+    if (c > 0) {
+      KLOGI(TAG, "client %s subscribe msg %s, post persist msg to client",
+          sender->auth_extra.c_str(), name.c_str());
+      sender->write(buffer, c);
     }
   }
   return true;
@@ -120,14 +111,11 @@ bool Dispatcher::handle_unsubscribe_req(shared_ptr<Caps>& msg_caps,
   uint32_t msgtype;
   string name;
 
-  if (RequestParser::parse_unsubscribe(msg_caps, name, msgtype) != 0)
-    return false;
-  if (!is_valid_msgtype(msgtype))
+  if (RequestParser::parse_unsubscribe(msg_caps, name) != 0)
     return false;
   if (name.length() == 0)
     return false;
-  SubscriptionMap& submap = subscriptions[msgtype];
-  AdapterList& adapters = submap[name];
+  AdapterList& adapters = subscriptions[name];
   AdapterList::iterator it;
   for (it = adapters.begin(); it != adapters.end(); ++it) {
     if ((*it).get() == sender.get()) {
@@ -158,13 +146,12 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
   if (name.length() == 0)
     return false;
 
-  SubscriptionMap& submap = subscriptions[msgtype];
   SubscriptionMap::iterator sit;
   int32_t svrid = 0;
   bool has_subscription = true;
 
-  sit = submap.find(name);
-  if (sit == submap.end() || sit->second.empty())
+  sit = subscriptions.find(name);
+  if (sit == subscriptions.end() || sit->second.empty())
     has_subscription = false;
   if (msgtype == FLORA_MSGTYPE_REQUEST)
     svrid = ++reqseq;
@@ -182,13 +169,11 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
         sit->second.erase(dit);
         continue;
       }
-      if ((*ait).get() != sender.get()) {
 #ifdef FLORA_DEBUG
-        KLOGI(TAG, "dispatch msg(%u) %s from %s to %s", msgtype, name.c_str(),
-            sender->auth_extra.c_str(), (*ait)->auth_extra.c_str());
+      KLOGI(TAG, "dispatch msg(%u) %s from %s to %s", msgtype, name.c_str(),
+          sender->auth_extra.c_str(), (*ait)->auth_extra.c_str());
 #endif
-        (*ait)->write(buffer, c);
-      }
+      (*ait)->write(buffer, c);
       ++ait;
     }
   }

@@ -13,11 +13,11 @@ public:
   static int32_t serialize_auth(uint32_t version, const char* extra,
       void* data, uint32_t size);
 
-  static int32_t serialize_subscribe(const char* name, uint32_t msgtype,
-      void* data, uint32_t size);
+  static int32_t serialize_subscribe(const char* name, void* data,
+      uint32_t size);
 
-  static int32_t serialize_unsubscribe(const char* name, uint32_t msgtype,
-      void* data, uint32_t size);
+  static int32_t serialize_unsubscribe(const char* name, void* data,
+      uint32_t size);
 
   // when 'msgtype' == FLORA_MSGTYPE_REQUEST, 'id', 'timeout'参数有效
   static int32_t serialize_post(const char* name, uint32_t msgtype,
@@ -45,10 +45,10 @@ public:
       uint32_t& version, std::string& extra);
 
   static int32_t parse_subscribe(std::shared_ptr<Caps>& caps,
-      std::string& name, uint32_t& msgtype);
+      std::string& name);
 
   static int32_t parse_unsubscribe(std::shared_ptr<Caps>& caps,
-      std::string& name, uint32_t& msgtype);
+      std::string& name);
 
   static int32_t parse_post(std::shared_ptr<Caps>& caps, std::string& name,
       uint32_t& msgtype, std::shared_ptr<Caps>& args, int32_t& id,

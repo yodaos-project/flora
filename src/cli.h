@@ -33,9 +33,9 @@ public:
   void close(bool passive);
 
   // implementation of flora::Client
-  int32_t subscribe(const char* name, uint32_t msgtype);
+  int32_t subscribe(const char* name);
 
-  int32_t unsubscribe(const char* name, uint32_t msgtype);
+  int32_t unsubscribe(const char* name);
 
   int32_t post(const char* name, std::shared_ptr<Caps>& msg, uint32_t msgtype);
 

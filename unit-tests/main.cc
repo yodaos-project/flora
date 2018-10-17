@@ -97,28 +97,22 @@ static bool check_results(TestClient* clients, int32_t num) {
 		}
 	}
 
-	int32_t post_counter[FLORA_MSG_COUNT];
 	for (i = 0; i < num; ++i) {
-		memcpy(post_counter, total_post_counter, sizeof(post_counter));
-		for (j = 0; j < FLORA_MSG_COUNT; ++j) {
-			post_counter[j] -= clients[i].post_counter[j];
-		}
-
 		for (j = 0; j < FLORA_MSG_COUNT; ++j) {
 			if (clients[i].subscribe_flags[j]) {
-				if (clients[i].recv_instant_counter[j] != post_counter[j]) {
+				if (clients[i].recv_instant_counter[j] != total_post_counter[j]) {
 					KLOGE(TAG, "client %d, msg(instant) %d recv/post not equal %d/%d",
-							i, j, clients[i].recv_instant_counter[j], post_counter[j]);
+							i, j, clients[i].recv_instant_counter[j], total_post_counter[j]);
 					return false;
 				}
-				if (clients[i].recv_persist_counter[j] != post_counter[j]) {
+				if (clients[i].recv_persist_counter[j] != total_post_counter[j]) {
 					KLOGE(TAG, "client %d, msg(persist) %d recv/post not equal %d/%d",
-							i, j, clients[i].recv_persist_counter[j], post_counter[j]);
+							i, j, clients[i].recv_persist_counter[j], total_post_counter[j]);
 					return false;
 				}
-				if (clients[i].recv_request_counter[j] != post_counter[j]) {
+				if (clients[i].recv_request_counter[j] != total_post_counter[j]) {
 					KLOGE(TAG, "client %d, msg(request) %d recv/post not equal %d/%d",
-							i, j, clients[i].recv_request_counter[j], post_counter[j]);
+							i, j, clients[i].recv_request_counter[j], total_post_counter[j]);
 					return false;
 				}
 			}

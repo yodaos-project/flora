@@ -27,12 +27,9 @@ void Agent::config(AgentConfigKey key, ...) {
   va_end(ap);
 }
 
-void Agent::subscribe(const char* name, uint32_t msgtype,
-    function<void(shared_ptr<Caps>&)>& cb) {
-  MsgId mid;
-  mid.name = name;
-  mid.type = msgtype;
-  msg_handlers.insert(make_pair(mid, cb));
+void Agent::subscribe(const char* name,
+    function<void(shared_ptr<Caps>&, uint32_t)>& cb) {
+  msg_handlers.insert(make_pair(name, cb));
 }
 
 void Agent::start(bool block) {
@@ -72,7 +69,7 @@ void Agent::subscribe_msgs(shared_ptr<Client>& cli) {
   MsgHandlerMap::iterator it;
 
 	for (it = msg_handlers.begin(); it != msg_handlers.end(); ++it) {
-		cli->subscribe((*it).first.name.c_str(), (*it).first.type);
+		cli->subscribe((*it).first.c_str());
 	}
 }
 
@@ -109,11 +106,8 @@ void Agent::destroy_client() {
 
 void Agent::recv_post(const char* name, uint32_t msgtype,
     shared_ptr<Caps>& msg) {
-  MsgId key;
-  key.name = name;
-  key.type = msgtype;
-  MsgHandlerMap::iterator it = msg_handlers.find(key);
-  it->second(msg);
+  MsgHandlerMap::iterator it = msg_handlers.find(name);
+  it->second(msg, msgtype);
 }
 
 void Agent::disconnected() {
