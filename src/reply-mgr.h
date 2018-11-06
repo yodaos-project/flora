@@ -21,7 +21,7 @@ typedef struct {
   int32_t msgid;
   int32_t pending_id;
   std::chrono::steady_clock::time_point tp_timeout;
-  std::vector<flora::Reply> replys;
+  std::vector<flora::Response> replys;
   AdapterList receivers;
 } PendingGet;
 typedef std::list<PendingGet> PendingGetList;

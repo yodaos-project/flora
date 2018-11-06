@@ -36,7 +36,7 @@ public:
       std::shared_ptr<Caps>& args, int32_t id, void* data, uint32_t size);
 
   static int32_t serialize_reply(const char* name, int32_t id,
-      std::vector<Reply>& datas, void* data, uint32_t size);
+      ResponseArray& datas, void* data, uint32_t size);
 };
 
 class RequestParser {
@@ -68,7 +68,7 @@ public:
       uint32_t& msgtype, std::shared_ptr<Caps>& args, int32_t& id);
 
   static int32_t parse_reply(std::shared_ptr<Caps>& caps,
-      std::string& name, std::vector<Reply>& replys);
+      std::string& name, ResponseArray& replys);
 };
 
 bool is_valid_msgtype(uint32_t msgtype);

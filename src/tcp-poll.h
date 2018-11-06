@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include "flora-svc.h"
 #include "sock-adap.h"
 #include "disp.h"
@@ -35,12 +36,15 @@ private:
 
   bool read_from_client(std::shared_ptr<SocketAdapter>& adap);
 
+  int get_listen_fd();
+
 private:
   std::shared_ptr<Dispatcher> dispatcher;
   int listen_fd = -1;
   uint32_t max_msg_size = 0;
   std::thread run_thread;
   std::mutex start_mutex;
+  std::condition_variable start_cond;
   AdapterMap adapters;
   std::string host;
   int32_t port;

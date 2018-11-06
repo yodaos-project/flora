@@ -23,7 +23,7 @@ UnixPoll::UnixPoll(const std::string& name) {
 }
 
 int32_t UnixPoll::start(shared_ptr<flora::Dispatcher>& disp) {
-  lock_guard<mutex> locker(start_mutex);
+  unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get())
     return FLORA_POLL_ALREADY_START;
   if (!init_socket()) {
@@ -32,6 +32,8 @@ int32_t UnixPoll::start(shared_ptr<flora::Dispatcher>& disp) {
   run_thread = thread([this]() { this->run(); });
   dispatcher = static_pointer_cast<Dispatcher>(disp);
   max_msg_size = dispatcher->max_msg_size();
+  // wait until thread running
+  start_cond.wait(locker);
   return FLORA_POLL_SUCCESS;
 }
 
@@ -42,6 +44,7 @@ void UnixPoll::stop() {
   int fd = listen_fd;
   listen_fd = -1;
   ::shutdown(fd, SHUT_RDWR);
+  locker.unlock();
   run_thread.join();
   ::close(fd);
   dispatcher.reset();
@@ -54,13 +57,17 @@ void UnixPoll::run() {
   socklen_t addr_len;
   int new_fd;
   int max_fd;
+  int lfd;
   AdapterMap::iterator adap_it;
   vector<int> pending_delete_adapters;
   size_t i;
 
+  start_mutex.lock();
   FD_ZERO(&all_fds);
   FD_SET(listen_fd, &all_fds);
   max_fd = listen_fd + 1;
+  start_cond.notify_one();
+  start_mutex.unlock();
   while (true) {
     rfds = all_fds;
     if (select(max_fd, &rfds, nullptr, nullptr, nullptr) < 0) {
@@ -72,14 +79,15 @@ void UnixPoll::run() {
       break;
     }
     // closed
-    if (listen_fd < 0) {
-      KLOGI(TAG, "listen fd = %d, unix poll quit", listen_fd);
+    lfd = get_listen_fd();
+    if (lfd < 0) {
+      KLOGI(TAG, "unix poll closed, quit");
       break;
     }
     // accept new connection
-    if (FD_ISSET(listen_fd, &rfds)) {
+    if (FD_ISSET(lfd, &rfds)) {
       addr_len = sizeof(addr);
-      new_fd = accept(listen_fd, (sockaddr*)&addr, &addr_len);
+      new_fd = accept(lfd, (sockaddr*)&addr, &addr_len);
       if (new_fd < 0) {
         KLOGE(TAG, "accept failed: %s", strerror(errno));
         continue;
@@ -170,6 +178,11 @@ bool UnixPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
     }
   }
   return true;
+}
+
+int UnixPoll::get_listen_fd() {
+  lock_guard<mutex> locker(start_mutex);
+  return listen_fd;
 }
 
 } // namespace internal

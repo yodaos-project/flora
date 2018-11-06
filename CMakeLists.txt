@@ -125,4 +125,20 @@ target_link_libraries(flora-test
 )
 set_target_properties(flora-test PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 install(TARGETS flora-test RUNTIME DESTINATION bin)
+
+file(GLOB flora_demo_SOURCES
+  examples/*.h
+  examples/*.cc
+)
+add_executable(flora-demo
+  ${flora_demo_SOURCES}
+)
+target_include_directories(flora-demo
+  PRIVATE include ${mutils_INCLUDE_DIRS}
+)
+target_link_libraries(flora-demo
+  flora-cli
+  flora-svc
+  ${mutils_LIBRARIES}
+)
 endif(BUILD_TEST)

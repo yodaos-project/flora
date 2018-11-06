@@ -17,7 +17,8 @@ namespace internal {
 
 typedef struct {
   int32_t id;
-  std::vector<Reply>* results;
+  ResponseArray* results;
+  std::function<void(ResponseArray&)> callback;
   std::chrono::steady_clock::time_point timeout;
 } PendingRequest;
 typedef std::list<PendingRequest> PendingRequestList;
@@ -40,7 +41,15 @@ public:
   int32_t post(const char* name, std::shared_ptr<Caps>& msg, uint32_t msgtype);
 
   int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::vector<Reply>& replys, uint32_t timeout);
+      ResponseArray& replys, uint32_t timeout);
+
+  int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>&& cb,
+      uint32_t timeout);
+
+  int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>& cb,
+      uint32_t timeout);
 
 private:
   bool auth(const std::string& extra);

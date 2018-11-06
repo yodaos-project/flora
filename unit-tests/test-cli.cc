@@ -86,7 +86,7 @@ void TestClient::do_post() {
 	int32_t c = rand() % MAX_POST_COUNT;
 	int32_t i;
 	int32_t idx;
-	vector<Reply> results;
+	vector<Response> results;
 	flora_get_result* c_results;
 	uint32_t res_count;
 	int32_t r[3];

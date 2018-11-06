@@ -112,7 +112,7 @@ int32_t ResponseSerializer::serialize_post(const char* name,
 }
 
 int32_t ResponseSerializer::serialize_reply(const char* name,
-    int32_t id, vector<Reply>& datas, void* data,
+    int32_t id, ResponseArray& datas, void* data,
     uint32_t size) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_RESP);
@@ -223,7 +223,7 @@ int32_t ResponseParser::parse_post(shared_ptr<Caps>& caps, string& name,
 }
 
 int32_t ResponseParser::parse_reply(shared_ptr<Caps>& caps, string& name,
-    vector<Reply>& replys) {
+    ResponseArray& replys) {
   int32_t count;
   const char* s;
 

@@ -23,6 +23,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <functional>
 
 namespace flora {
 
@@ -30,7 +31,15 @@ typedef struct {
   int32_t ret_code;
   std::shared_ptr<Caps> data;
   std::string extra;
-} Reply;
+} Response;
+
+typedef std::vector<Response> ResponseArray;
+
+class Reply {
+public:
+  int32_t ret_code = FLORA_CLI_SUCCESS;
+  std::shared_ptr<Caps> data;
+};
 
 class ClientCallback;
 
@@ -46,7 +55,15 @@ public:
       uint32_t msgtype) = 0;
 
   virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::vector<Reply>& replys, uint32_t timeout = 0) = 0;
+      ResponseArray& replys, uint32_t timeout = 0) = 0;
+
+  virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>&& cb,
+      uint32_t timeout = 0) = 0;
+
+  virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>& cb,
+      uint32_t timeout = 0) = 0;
 
   static int32_t connect(const char* uri, ClientCallback* cb,
       uint32_t msg_buf_size, std::shared_ptr<Client>& result);
@@ -59,10 +76,8 @@ public:
   virtual void recv_post(const char* name, uint32_t msgtype,
       std::shared_ptr<Caps>& msg) {}
 
-  virtual int32_t recv_get(const char* name, std::shared_ptr<Caps>& msg,
-      std::shared_ptr<Caps>& reply) {
-    return FLORA_CLI_SUCCESS;
-  }
+  virtual void recv_get(const char* name, std::shared_ptr<Caps>& msg,
+      Reply& reply) {}
 
   virtual void disconnected() {}
 };
@@ -98,6 +113,7 @@ typedef struct {
   // 可能为空字串
   char* extra;
 } flora_get_result;
+typedef void (*flora_get_callback_t)(flora_get_result* results, uint32_t count);
 
 // uri: 支持的schema:
 //     tcp://$(host):$(port)/<#extra>
@@ -123,6 +139,9 @@ int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_
 // send REQUEST msg and recv results
 int32_t flora_cli_get(flora_cli_t handle, const char* name, caps_t msg,
     flora_get_result** results, uint32_t* res_buf_size, uint32_t timeout);
+
+int32_t flora_cli_get_nb(flora_cli_t handle, const char* name, caps_t msg,
+    flora_get_callback_t cb, uint32_t timeout);
 
 void flora_result_delete(flora_get_result* results, uint32_t size);
 

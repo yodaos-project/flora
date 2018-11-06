@@ -26,7 +26,7 @@ enum class AgentConfigKey {
 };
 
 typedef std::map<std::string,
-          std::function<void(std::shared_ptr<Caps>&, uint32_t)>
+          std::function<void(std::shared_ptr<Caps>&, uint32_t, Reply*)>
         > MsgHandlerMap;
 
 class Agent : public ClientCallback {
@@ -34,7 +34,9 @@ public:
   void config(AgentConfigKey key, ...);
 
   void subscribe(const char* name,
-      std::function<void(std::shared_ptr<Caps>&, uint32_t)>& cb);
+      std::function<void(std::shared_ptr<Caps>&, uint32_t, Reply*)>&& cb);
+
+  void unsubscribe(const char* name);
 
   void start(bool block = false);
 
@@ -42,9 +44,20 @@ public:
 
   int32_t post(const char* name, std::shared_ptr<Caps>& msg, uint32_t msgtype);
 
+  int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      ResponseArray& responses, uint32_t timeout = 0);
+
+  int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>&& cb, uint32_t timeout = 0);
+
+  int32_t get(const char* name, std::shared_ptr<Caps>& msg,
+      std::function<void(ResponseArray&)>& cb, uint32_t timeout = 0);
+
   // override ClientCallback
   void recv_post(const char* name, uint32_t msgtype,
       std::shared_ptr<Caps>& msg);
+
+  void recv_get(const char* name, std::shared_ptr<Caps>& msg, Reply& reply);
 
   void disconnected();
 
