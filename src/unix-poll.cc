@@ -101,9 +101,7 @@ void UnixPoll::run() {
     // read
     for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
       if (FD_ISSET(adap_it->first, &rfds)) {
-#ifdef FLORA_DEBUG
-        KLOGI(TAG, "read from fd %d", adap_it->first);
-#endif
+        KLOGD(TAG, "read from fd %d", adap_it->first);
         if (!read_from_client(adap_it->second)) {
           pending_delete_adapters.push_back(adap_it->first);
           FD_CLR(adap_it->first, &all_fds);

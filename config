@@ -9,6 +9,7 @@ Configuration:
     --help                      display this help and exit
     --debug                     build for debug
     --test                      build unit-tests
+    --log-enabled=LEVEL         set log level (verbose|debug|info|warn|error)
     --build-dir=DIR             build directory
     --prefix=PREFIX             install prefix
     --cmake-modules=DIR         directory of cmake modules file exist
@@ -44,6 +45,9 @@ do
 			;;
 		--test)
 			CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_TEST=ON)
+			;;
+		--log-enabled=*)
+			CMAKE_ARGS=(${CMAKE_ARGS[@]} -DLOG_ENABLED=$conf_optarg)
 			;;
 		--build-dir=*)
 			builddir=$conf_optarg

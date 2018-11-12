@@ -91,6 +91,8 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
       return true;
   }
   adapters.push_back(sender);
+  KLOGI(TAG, "client %s subscribe msg %s", sender->auth_extra.c_str(),
+      name.c_str());
 
   // post persist messge to client
   PersistMsgMap::iterator pit = persist_msgs.find(name);
@@ -139,10 +141,8 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
     return false;
   if (!is_valid_msgtype(msgtype))
     return false;
-#ifdef FLORA_DEBUG
   KLOGI(TAG, "recv msg(%u) %s from %s", msgtype, name.c_str(),
       sender->auth_extra.c_str());
-#endif
   if (name.length() == 0)
     return false;
 
@@ -169,10 +169,8 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
         sit->second.erase(dit);
         continue;
       }
-#ifdef FLORA_DEBUG
       KLOGI(TAG, "dispatch msg(%u) %s from %s to %s", msgtype, name.c_str(),
           sender->auth_extra.c_str(), (*ait)->auth_extra.c_str());
-#endif
       (*ait)->write(buffer, c);
       ++ait;
     }
@@ -182,10 +180,8 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
     PersistMsg& pmsg = persist_msgs[name];
     pmsg.data = args;
   } else if (msgtype == FLORA_MSGTYPE_REQUEST) {
-#ifdef FLORA_DEBUG
     KLOGI(TAG, "reply manager add request: sender %s, name %s, timeout %u",
         sender->auth_extra.c_str(), name.c_str(), timeout);
-#endif
     static AdapterList empty_adapter_list;
     if (has_subscription)
       reply_mgr.add_req(sender, name.c_str(), cliid, svrid, timeout, sit->second);
@@ -204,9 +200,7 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps>& msg_caps,
 
   if (RequestParser::parse_reply(msg_caps, name, args, id, retcode) != 0)
     return false;
-#ifdef FLORA_DEBUG
   KLOGI(TAG, "handle_reply_req, name %s, retcode %d", name.c_str(), retcode);
-#endif
   if (name.length() == 0)
     return false;
   reply_mgr.put_reply(sender, name.c_str(), id, retcode, args);

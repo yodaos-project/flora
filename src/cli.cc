@@ -119,6 +119,10 @@ void Client::recv_loop() {
 	}
 
 	while (true) {
+    if (rbuf_off == buf_size) {
+      KLOGW(TAG, "recv buffer not enough, %u bytes", buf_size);
+      break;
+    }
 		c = conn->recv(rbuffer + rbuf_off, buf_size - rbuf_off);
 		if (c <= 0)
 			break;
