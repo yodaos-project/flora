@@ -44,12 +44,10 @@ public:
       ResponseArray& replys, uint32_t timeout);
 
   int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::function<void(ResponseArray&)>&& cb,
-      uint32_t timeout);
+      std::function<void(ResponseArray&)>&& cb);
 
   int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::function<void(ResponseArray&)>& cb,
-      uint32_t timeout);
+      std::function<void(ResponseArray&)>& cb);
 
 private:
   bool auth(const std::string& extra);

@@ -381,11 +381,11 @@ exit:
 }
 
 int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
-    function<void(ResponseArray&)>& cb, uint32_t timeout) {
+    function<void(ResponseArray&)>& cb) {
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
-			msg, ++reqseq, timeout, sbuffer, buf_size);
+			msg, ++reqseq, 0, sbuffer, buf_size);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 
@@ -394,10 +394,6 @@ int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
 	(*it).id = reqseq;
 	(*it).results = nullptr;
   (*it).callback = cb;
-	if (timeout == 0)
-		(*it).timeout = steady_clock::time_point::max();
-	else
-		(*it).timeout = steady_clock::now() + milliseconds(timeout);
 	cli_mutex.lock();
 	if (connection.get() == nullptr || !connection->send(sbuffer, c)) {
 		cli_mutex.unlock();
@@ -414,8 +410,8 @@ int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
 }
 
 int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
-		function<void(ResponseArray&)>&& cb, uint32_t timeout) {
-  return get(name, msg, cb, timeout);
+		function<void(ResponseArray&)>&& cb) {
+  return get(name, msg, cb);
 }
 
 } // namespace internal
@@ -520,7 +516,7 @@ int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_
 	return reinterpret_cast<Client*>(handle)->post(name, pmsg, msgtype);
 }
 
-static void cxxreplys_to_creplys(ResponseArray& replys, flora_get_result* results) {
+void cxxreplys_to_creplys(ResponseArray& replys, flora_get_result* results) {
 	size_t i;
 	string* extra;
 
@@ -569,7 +565,7 @@ void flora_result_delete(flora_get_result* results, uint32_t size) {
 }
 
 int32_t flora_cli_get_nb(flora_cli_t handle, const char* name, caps_t msg,
-    flora_get_callback_t cb, uint32_t timeout) {
+    flora_get_callback_t cb) {
 	if (handle == 0)
 		return FLORA_CLI_EINVAL;
 	shared_ptr<Caps> pmsg = Caps::convert(msg);
@@ -581,8 +577,7 @@ int32_t flora_cli_get_nb(flora_cli_t handle, const char* name, caps_t msg,
           cb(results, replys.size());
           flora_result_delete(results, replys.size());
         }
-      }, timeout
+      }
   );
   return r;
 }
-

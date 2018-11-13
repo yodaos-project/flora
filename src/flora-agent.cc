@@ -1,4 +1,4 @@
-#include <stdarg.h>
+#include <string.h>
 #include <thread>
 #include "flora-agent.h"
 #include "rlog.h"
@@ -10,21 +10,25 @@ using namespace std::chrono;
 
 namespace flora {
 
-void Agent::config(AgentConfigKey key, ...) {
+void Agent::config(uint32_t key, ...) {
   va_list ap;
   va_start(ap, key);
+  config(key, ap);
+  va_end(ap);
+}
+
+void Agent::config(uint32_t key, va_list ap) {
   switch (key) {
-    case AgentConfigKey::URI:
+    case FLORA_AGENT_CONFIG_URI:
       uri = va_arg(ap, const char*);
       break;
-    case AgentConfigKey::BUFSIZE:
+    case FLORA_AGENT_CONFIG_BUFSIZE:
       bufsize = va_arg(ap, uint32_t);
       break;
-    case AgentConfigKey::RECONN_INTERVAL:
+    case FLORA_AGENT_CONFIG_RECONN_INTERVAL:
       reconn_interval = milliseconds(va_arg(ap, uint32_t));
       break;
   }
-  va_end(ap);
 }
 
 void Agent::subscribe(const char* name,
@@ -137,12 +141,12 @@ int32_t Agent::get(const char* name, shared_ptr<Caps>& msg,
 }
 
 int32_t Agent::get(const char* name, shared_ptr<Caps>& msg,
-    function<void(ResponseArray&)>&& cb, uint32_t timeout) {
-  return get(name, msg, cb, timeout);
+    function<void(ResponseArray&)>&& cb) {
+  return get(name, msg, cb);
 }
 
 int32_t Agent::get(const char* name, shared_ptr<Caps>& msg,
-    function<void(ResponseArray&)>& cb, uint32_t timeout) {
+    function<void(ResponseArray&)>& cb) {
   shared_ptr<Client> cli;
 
   conn_mutex.lock();
@@ -152,7 +156,7 @@ int32_t Agent::get(const char* name, shared_ptr<Caps>& msg,
   if (cli.get() == nullptr) {
     return FLORA_CLI_ECONN;
   }
-  int32_t r = cli->get(name, msg, cb, timeout);
+  int32_t r = cli->get(name, msg, cb);
   if (r == FLORA_CLI_ECONN) {
     destroy_client();
   }
@@ -189,3 +193,95 @@ void Agent::disconnected() {
 }
 
 } // namespace flora
+
+using namespace flora;
+flora_agent_t flora_agent_create() {
+  Agent* agent = new Agent();
+  return reinterpret_cast<flora_agent_t>(agent);
+}
+
+void flora_agent_config(flora_agent_t agent, uint32_t key, ...) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  va_list ap;
+  va_start(ap, key);
+  cxxagent->config(key, ap);
+  va_end(ap);
+}
+
+void flora_agent_subscribe(flora_agent_t agent, const char* name,
+    flora_agent_subscribe_callback_t cb, void* arg) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  cxxagent->subscribe(name, [cb, arg](shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
+      caps_t cmsg = Caps::convert(msg);
+      flora_reply_t creply;
+      memset(&creply, 0, sizeof(creply));
+      cb(cmsg, type, &creply, arg);
+      caps_destroy(cmsg);
+      if (type == FLORA_MSGTYPE_REQUEST) {
+        reply->ret_code = creply.ret_code;
+        reply->data = Caps::convert(creply.data);
+      }
+      caps_destroy(creply.data);
+  });
+}
+
+void flora_agent_unsubscribe(flora_agent_t agent, const char* name) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  cxxagent->unsubscribe(name);
+}
+
+void flora_agent_start(flora_agent_t agent, int32_t block) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  cxxagent->start(block);
+}
+
+void flora_agent_close(flora_agent_t agent) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  cxxagent->close();
+}
+
+int32_t flora_agent_post(flora_agent_t agent, const char* name,
+    caps_t msg, uint32_t msgtype) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  shared_ptr<Caps> cxxmsg = Caps::convert(msg);
+  return cxxagent->post(name, cxxmsg, msgtype);
+}
+
+void cxxreplys_to_creplys(ResponseArray& replys, flora_get_result* results);
+int32_t flora_agent_get(flora_agent_t agent, const char* name, caps_t msg,
+    flora_get_result** results, uint32_t* res_size, uint32_t timeout) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  shared_ptr<Caps> cxxmsg = Caps::convert(msg);
+  ResponseArray resps;
+  int32_t r = cxxagent->get(name, cxxmsg, resps, timeout);
+  if (r != FLORA_CLI_SUCCESS)
+    return r;
+  if (resps.empty()) {
+    *res_size = 0;
+    *results = nullptr;
+  }
+  *results = new flora_get_result[resps.size()];
+  cxxreplys_to_creplys(resps, *results);
+  *res_size = resps.size();
+  return FLORA_CLI_SUCCESS;
+}
+
+int32_t flora_agent_get_nb(flora_agent_t agent, const char* name, caps_t msg,
+    flora_agent_get_callback_t cb, void* arg) {
+  Agent* cxxagent = reinterpret_cast<Agent*>(agent);
+  shared_ptr<Caps> cxxmsg = Caps::convert(msg);
+  return cxxagent->get(name, cxxmsg, [cb, arg](ResponseArray& resps) {
+    flora_get_result* results;
+    if (resps.empty()) {
+      cb(nullptr, 0, arg);
+    } else {
+      results = new flora_get_result[resps.size()];
+      cxxreplys_to_creplys(resps, results);
+      cb(results, resps.size(), arg);
+    }
+  });
+}
+
+void flora_agent_delete(flora_agent_t agent) {
+  delete reinterpret_cast<Agent*>(agent);
+}

@@ -72,6 +72,6 @@ make install
 
 ## 使用说明
 
-[c++接口](./cpp_api.md)
+[c++接口](./docs/cpp-api.md)
 
-[c接口](./c_api.md)
+[c接口](./docs/c-api.md)

@@ -25,4 +25,5 @@ private:
   std::shared_ptr<flora::Poll> poll;
   std::shared_ptr<flora::Dispatcher> dispatcher;
   flora::Agent agents[AGENT_NUMBER];
+  flora_agent_t cagents[AGENT_NUMBER];
 };

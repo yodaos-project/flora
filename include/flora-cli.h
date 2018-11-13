@@ -58,12 +58,10 @@ public:
       ResponseArray& replys, uint32_t timeout = 0) = 0;
 
   virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::function<void(ResponseArray&)>&& cb,
-      uint32_t timeout = 0) = 0;
+      std::function<void(ResponseArray&)>&& cb) = 0;
 
   virtual int32_t get(const char* name, std::shared_ptr<Caps>& msg,
-      std::function<void(ResponseArray&)>& cb,
-      uint32_t timeout = 0) = 0;
+      std::function<void(ResponseArray&)>& cb) = 0;
 
   static int32_t connect(const char* uri, ClientCallback* cb,
       uint32_t msg_buf_size, std::shared_ptr<Client>& result);
@@ -141,7 +139,7 @@ int32_t flora_cli_get(flora_cli_t handle, const char* name, caps_t msg,
     flora_get_result** results, uint32_t* res_buf_size, uint32_t timeout);
 
 int32_t flora_cli_get_nb(flora_cli_t handle, const char* name, caps_t msg,
-    flora_get_callback_t cb, uint32_t timeout);
+    flora_get_callback_t cb);
 
 void flora_result_delete(flora_get_result* results, uint32_t size);
 
