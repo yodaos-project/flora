@@ -71,8 +71,8 @@ void Agent::start(bool block) {
         working = true;
         this->run();
     });
-    // wait run thread execute
-    conn_cond.wait(locker);
+    // wait run thread execute and connect service
+    start_cond.wait(locker);
   }
 }
 
@@ -81,19 +81,18 @@ void Agent::run() {
   shared_ptr<Client> cli;
   int32_t r;
 
-  // notify 'Agent.start'
-  conn_cond.notify_one();
-
   while (working) {
     r = Client::connect(uri.c_str(), this, bufsize, cli);
     if (r != FLORA_CLI_SUCCESS) {
       KLOGI(TAG, "connect to flora service %s failed, retry after %u milliseconds",
           uri.c_str(), reconn_interval.count());
+      start_cond.notify_one();
       conn_cond.wait_for(locker, reconn_interval);
     } else {
       KLOGI(TAG, "flora service %s connected", uri.c_str());
       subscribe_msgs(cli);
       flora_cli = cli;
+      start_cond.notify_one();
       conn_cond.wait(locker);
     }
   }

@@ -81,6 +81,8 @@ private:
   MsgHandlerMap msg_handlers;
   std::mutex conn_mutex;
   std::condition_variable conn_cond;
+  // 'start' and try connect flora service once
+  std::condition_variable start_cond;
   std::shared_ptr<Client> flora_cli;
   std::thread run_thread;
   bool working = false;
