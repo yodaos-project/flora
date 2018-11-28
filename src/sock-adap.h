@@ -16,7 +16,7 @@
 
 class SocketAdapter : public Adapter {
 public:
-  SocketAdapter(int sock, uint32_t bufsize);
+  SocketAdapter(int sock, uint32_t bufsize, uint32_t flags);
 
   ~SocketAdapter();
 

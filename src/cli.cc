@@ -66,12 +66,14 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 		if (!conn->connect(urip.path))
 			return FLORA_CLI_ECONN;
 		connection.reset(conn);
+    serialize_flags = 0;
 	} else if (urip.scheme == "tcp") {
 		TCPConn* conn;
 		conn = new TCPConn();
 		if (!conn->connect(urip.host, urip.port))
 			return FLORA_CLI_ECONN;
 		connection.reset(conn);
+    serialize_flags = CAPS_FLAG_NET_BYTEORDER;
 	} else {
 		KLOGE(TAG, "unsupported uri scheme %s", urip.scheme.c_str());
 		return FLORA_CLI_EINVAL;
@@ -88,7 +90,8 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 }
 
 bool Client::auth(const string& extra) {
-	int32_t c = RequestSerializer::serialize_auth(FLORA_VERSION, extra.c_str(), sbuffer, buf_size);
+	int32_t c = RequestSerializer::serialize_auth(FLORA_VERSION,
+      extra.c_str(), sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return false;
 	if (!connection->send(sbuffer, c))
@@ -169,7 +172,7 @@ bool Client::handle_received(int32_t size) {
 						callback->recv_get(name.c_str(), args, reply);
 						int32_t c = RequestSerializer::serialize_reply(
 								name.c_str(), reply.data, msgid, reply.ret_code, sbuffer,
-								buf_size);
+								buf_size, serialize_flags);
 						if (!connection->send(sbuffer, c))
 							return false;
 #ifdef FLORA_DEBUG
@@ -254,7 +257,7 @@ int32_t Client::subscribe(const char* name) {
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_subscribe(name,
-			sbuffer, buf_size);
+			sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 	cli_mutex.lock();
@@ -274,7 +277,7 @@ int32_t Client::unsubscribe(const char* name) {
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_unsubscribe(name,
-			sbuffer, buf_size);
+			sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 	cli_mutex.lock();
@@ -296,7 +299,7 @@ int32_t Client::post(const char* name, shared_ptr<Caps>& msg,
 			|| msgtype == FLORA_MSGTYPE_REQUEST)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_post(name, msgtype, msg,
-			0, 0, sbuffer, buf_size);
+			0, 0, sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 	cli_mutex.lock();
@@ -319,7 +322,7 @@ int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
-			msg, ++reqseq, timeout, sbuffer, buf_size);
+			msg, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 	replys.clear();
@@ -385,7 +388,7 @@ int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
 	if (name == nullptr)
 		return FLORA_CLI_EINVAL;
 	int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
-			msg, ++reqseq, 0, sbuffer, buf_size);
+			msg, ++reqseq, 0, sbuffer, buf_size, serialize_flags);
 	if (c <= 0)
 		return FLORA_CLI_EINVAL;
 

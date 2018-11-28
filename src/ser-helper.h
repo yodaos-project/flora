@@ -11,32 +11,34 @@ namespace internal {
 class RequestSerializer {
 public:
   static int32_t serialize_auth(uint32_t version, const char* extra,
-      void* data, uint32_t size);
+      void* data, uint32_t size, uint32_t flags);
 
   static int32_t serialize_subscribe(const char* name, void* data,
-      uint32_t size);
+      uint32_t size, uint32_t flags);
 
   static int32_t serialize_unsubscribe(const char* name, void* data,
-      uint32_t size);
+      uint32_t size, uint32_t flags);
 
   // when 'msgtype' == FLORA_MSGTYPE_REQUEST, 'id', 'timeout'参数有效
   static int32_t serialize_post(const char* name, uint32_t msgtype,
       std::shared_ptr<Caps>& args, int32_t id, uint32_t timeout,
-      void* data, uint32_t size);
+      void* data, uint32_t size, uint32_t flags);
 
   static int32_t serialize_reply(const char* name, std::shared_ptr<Caps>& args,
-      int32_t id, int32_t retcode, void* data, uint32_t size);
+      int32_t id, int32_t retcode, void* data, uint32_t size, uint32_t flags);
 };
 
 class ResponseSerializer {
 public:
-  static int32_t serialize_auth(int32_t result, void* data, uint32_t size);
+  static int32_t serialize_auth(int32_t result, void* data,
+      uint32_t size, uint32_t flags);
 
   static int32_t serialize_post(const char* name, uint32_t msgtype,
-      std::shared_ptr<Caps>& args, int32_t id, void* data, uint32_t size);
+      std::shared_ptr<Caps>& args, int32_t id, void* data,
+      uint32_t size, uint32_t flags);
 
   static int32_t serialize_reply(const char* name, int32_t id,
-      ResponseArray& datas, void* data, uint32_t size);
+      ResponseArray& datas, void* data, uint32_t size, uint32_t flags);
 };
 
 class RequestParser {

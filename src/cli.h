@@ -70,6 +70,7 @@ private:
   std::condition_variable req_reply_cond;
   PendingRequestList pending_requests;
   int32_t reqseq = 0;
+  uint32_t serialize_flags = 0;
 
 public:
   std::string auth_extra;

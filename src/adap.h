@@ -10,6 +10,8 @@ typedef struct {
 
 class Adapter {
 public:
+  Adapter(uint32_t flags) : serialize_flags(flags) {}
+
   virtual ~Adapter() = default;
 
   virtual int32_t read() = 0;
@@ -24,6 +26,7 @@ public:
 
 public:
   std::string auth_extra;
+  uint32_t serialize_flags = 0;
 #ifdef FLORA_DEBUG
   uint32_t recv_times = 0;
   uint32_t recv_bytes = 0;

@@ -69,7 +69,7 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps>& msg_caps,
         version, FLORA_VERSION);
   }
   int32_t c = ResponseSerializer::serialize_auth(result, buffer,
-      buf_size);
+      buf_size, sender->serialize_flags);
   if (c < 0)
     return false;
   sender->write(buffer, c);
@@ -98,7 +98,8 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps>& msg_caps,
   PersistMsgMap::iterator pit = persist_msgs.find(name);
   if (pit != persist_msgs.end()) {
     int32_t c = ResponseSerializer::serialize_post(name.c_str(),
-        FLORA_MSGTYPE_PERSIST, pit->second.data, 0, buffer, buf_size);
+        FLORA_MSGTYPE_PERSIST, pit->second.data, 0, buffer, buf_size,
+        sender->serialize_flags);
     if (c > 0) {
       KLOGI(TAG, "client %s subscribe msg %s, post persist msg to client",
           sender->auth_extra.c_str(), name.c_str());
@@ -157,7 +158,7 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps>& msg_caps,
     svrid = ++reqseq;
   if (has_subscription) {
     int32_t c = ResponseSerializer::serialize_post(name.c_str(), msgtype,
-        args, svrid, buffer, buf_size);
+        args, svrid, buffer, buf_size, sender->serialize_flags);
     if (c < 0)
       return false;
     AdapterList::iterator ait;

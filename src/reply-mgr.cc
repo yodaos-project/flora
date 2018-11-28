@@ -128,7 +128,7 @@ void ReplyManager::handle_completed_replys() {
     if ((*it).receivers.empty()) {
       c = ResponseSerializer::serialize_reply(
           (*it).msg_name.c_str(), (*it).msgid,
-          (*it).replys, buffer, buf_size);
+          (*it).replys, buffer, buf_size, (*it).sender->serialize_flags);
       if (c > 0)
         (*it).sender->write(buffer, c);
       dit = it;

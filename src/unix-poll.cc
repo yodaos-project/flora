@@ -141,7 +141,8 @@ bool UnixPoll::init_socket() {
 }
 
 void UnixPoll::new_adapter(int fd) {
-  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd, max_msg_size);
+  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd,
+      max_msg_size, 0);
   adapters.insert(make_pair(fd, adap));
 }
 

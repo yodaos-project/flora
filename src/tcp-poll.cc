@@ -148,7 +148,8 @@ bool TCPPoll::init_socket() {
 }
 
 void TCPPoll::new_adapter(int fd) {
-  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd, max_msg_size);
+  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd,
+      max_msg_size, CAPS_FLAG_NET_BYTEORDER);
   adapters.insert(make_pair(fd, adap));
 }
 

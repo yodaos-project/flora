@@ -8,7 +8,8 @@
 
 #define TAG "flora.SocketAdapter"
 
-SocketAdapter::SocketAdapter(int sock, uint32_t bufsize) : socket(sock) {
+SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
+    : Adapter(flags), socket(sock) {
   buffer = (int8_t*)mmap(NULL, bufsize, PROT_READ | PROT_WRITE,
       MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   buf_size = bufsize;
