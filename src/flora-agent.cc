@@ -84,27 +84,27 @@ void Agent::run() {
   // notify 'Agent.start'
   conn_cond.notify_one();
 
-	while (working) {
-		r = Client::connect(uri.c_str(), this, bufsize, cli);
-		if (r != FLORA_CLI_SUCCESS) {
-			KLOGI(TAG, "connect to flora service %s failed, retry after %u milliseconds",
-					uri.c_str(), reconn_interval.count());
-			conn_cond.wait_for(locker, reconn_interval);
-		} else {
-			KLOGI(TAG, "flora service %s connected", uri.c_str());
-			subscribe_msgs(cli);
+  while (working) {
+    r = Client::connect(uri.c_str(), this, bufsize, cli);
+    if (r != FLORA_CLI_SUCCESS) {
+      KLOGI(TAG, "connect to flora service %s failed, retry after %u milliseconds",
+          uri.c_str(), reconn_interval.count());
+      conn_cond.wait_for(locker, reconn_interval);
+    } else {
+      KLOGI(TAG, "flora service %s connected", uri.c_str());
+      subscribe_msgs(cli);
       flora_cli = cli;
-			conn_cond.wait(locker);
-		}
-	}
+      conn_cond.wait(locker);
+    }
+  }
 }
 
 void Agent::subscribe_msgs(shared_ptr<Client>& cli) {
   MsgHandlerMap::iterator it;
 
-	for (it = msg_handlers.begin(); it != msg_handlers.end(); ++it) {
-		cli->subscribe((*it).first.c_str());
-	}
+  for (it = msg_handlers.begin(); it != msg_handlers.end(); ++it) {
+    cli->subscribe((*it).first.c_str());
+  }
 }
 
 void Agent::close() {

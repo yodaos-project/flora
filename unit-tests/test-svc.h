@@ -7,16 +7,16 @@ using namespace flora;
 
 class TestService {
 public:
-	bool run(const char* uri, bool capi);
+  bool run(const char* uri, bool capi);
 
-	void close();
+  void close();
 
 private:
-	shared_ptr<Dispatcher> dispatcher;
-	shared_ptr<Poll> fpoll;
+  shared_ptr<Dispatcher> dispatcher;
+  shared_ptr<Poll> fpoll;
 
-	flora_dispatcher_t c_dispatcher = 0;
-	flora_poll_t c_fpoll = 0;
+  flora_dispatcher_t c_dispatcher = 0;
+  flora_poll_t c_fpoll = 0;
 
-	bool use_c_api = false;
+  bool use_c_api = false;
 };
