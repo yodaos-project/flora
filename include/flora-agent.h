@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
 #include "caps.h"
 #include "flora-cli.h"
 
@@ -31,6 +32,8 @@ typedef std::map<std::string,
 
 class Agent : public ClientCallback {
 public:
+  ~Agent();
+
   void config(uint32_t key, ...);
 
   void config(uint32_t key, va_list ap);
@@ -79,6 +82,7 @@ private:
   std::mutex conn_mutex;
   std::condition_variable conn_cond;
   std::shared_ptr<Client> flora_cli;
+  std::thread run_thread;
   bool working = false;
 };
 

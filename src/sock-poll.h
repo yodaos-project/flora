@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/select.h>
 #include <map>
 #include <memory>
 #include <string>
@@ -17,9 +18,11 @@ typedef std::map<int, std::shared_ptr<SocketAdapter> > AdapterMap;
 namespace flora {
 namespace internal {
 
-class TCPPoll : public flora::Poll {
+class SocketPoll : public flora::Poll {
 public:
-  TCPPoll(const std::string& host, int32_t port);
+  SocketPoll(const std::string& name);
+
+  SocketPoll(const std::string& host, int32_t port);
 
   int32_t start(std::shared_ptr<flora::Dispatcher>& disp);
 
@@ -28,7 +31,9 @@ public:
 private:
   void run();
 
-  bool init_socket();
+  bool init_unix_socket();
+
+  bool init_tcp_socket();
 
   void new_adapter(int fd);
 
@@ -38,6 +43,8 @@ private:
 
   int get_listen_fd();
 
+  int32_t do_poll(fd_set* rfds, int max_fd);
+
 private:
   std::shared_ptr<Dispatcher> dispatcher;
   int listen_fd = -1;
@@ -46,6 +53,10 @@ private:
   std::mutex start_mutex;
   std::condition_variable start_cond;
   AdapterMap adapters;
+  uint32_t type;
+  // for unix socket
+  std::string name;
+  // for tcp socket
   std::string host;
   int32_t port;
 };

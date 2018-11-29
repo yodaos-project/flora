@@ -1,6 +1,5 @@
 #include "flora-svc.h"
-#include "tcp-poll.h"
-#include "unix-poll.h"
+#include "sock-poll.h"
 #include "uri.h"
 
 using namespace std;
@@ -12,10 +11,10 @@ shared_ptr<flora::Poll> flora::Poll::new_instance(const char* uri) {
     return nullptr;
   if (urip.scheme == "unix") {
     return static_pointer_cast<flora::Poll>(
-        make_shared<flora::internal::UnixPoll>(urip.path));
+        make_shared<flora::internal::SocketPoll>(urip.path));
   } else if (urip.scheme == "tcp") {
     return static_pointer_cast<flora::Poll>(
-        make_shared<flora::internal::TCPPoll>(urip.host, urip.port));
+        make_shared<flora::internal::SocketPoll>(urip.host, urip.port));
   }
   return nullptr;
 }
@@ -28,11 +27,11 @@ int32_t flora_poll_new(const char* uri, flora_poll_t* result) {
     return FLORA_POLL_INVAL;
   if (urip.scheme == "unix") {
     *result = reinterpret_cast<flora_poll_t>(
-        new flora::internal::UnixPoll(urip.path));
+        new flora::internal::SocketPoll(urip.path));
     return FLORA_POLL_SUCCESS;
   } else if (urip.scheme == "tcp") {
     *result = reinterpret_cast<flora_poll_t>(
-        new flora::internal::TCPPoll(urip.host, urip.port));
+        new flora::internal::SocketPoll(urip.host, urip.port));
     return FLORA_POLL_SUCCESS;
   }
   return FLORA_POLL_UNSUPP;

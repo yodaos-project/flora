@@ -16,3 +16,7 @@
 #define MSG_HANDLER_COUNT 5
 
 #define DEFAULT_MSG_BUF_SIZE 32768
+
+#ifdef __APPLE__
+#define SELECT_BLOCK_IF_FD_CLOSED
+#endif

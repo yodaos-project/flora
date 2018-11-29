@@ -8,27 +8,40 @@
 #include <chrono>
 #include <vector>
 #include "flora-svc.h"
-#include "unix-poll.h"
+#include "sock-poll.h"
 #include "rlog.h"
 
 using namespace std;
 
 #define TAG "flora.UnixPoll"
+#define POLL_TYPE_UNIX 0
+#define POLL_TYPE_TCP 1
 
 namespace flora {
 namespace internal {
 
-UnixPoll::UnixPoll(const std::string& name) {
+SocketPoll::SocketPoll(const std::string& name) {
   this->name = name;
+  type = POLL_TYPE_UNIX;
 }
 
-int32_t UnixPoll::start(shared_ptr<flora::Dispatcher>& disp) {
+SocketPoll::SocketPoll(const std::string& host, int32_t port) {
+  this->host = host;
+  this->port = port;
+  type = POLL_TYPE_TCP;
+}
+
+int32_t SocketPoll::start(shared_ptr<flora::Dispatcher>& disp) {
   unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get())
     return FLORA_POLL_ALREADY_START;
-  if (!init_socket()) {
+  bool r;
+  if (type == POLL_TYPE_TCP)
+    r = init_tcp_socket();
+  else
+    r = init_unix_socket();
+  if (!r)
     return FLORA_POLL_SYSERR;
-  }
   run_thread = thread([this]() { this->run(); });
   dispatcher = static_pointer_cast<Dispatcher>(disp);
   max_msg_size = dispatcher->max_msg_size();
@@ -37,7 +50,7 @@ int32_t UnixPoll::start(shared_ptr<flora::Dispatcher>& disp) {
   return FLORA_POLL_SUCCESS;
 }
 
-void UnixPoll::stop() {
+void SocketPoll::stop() {
   unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get() == nullptr)
     return;
@@ -50,17 +63,53 @@ void UnixPoll::stop() {
   dispatcher.reset();
 }
 
-void UnixPoll::run() {
+int32_t SocketPoll::do_poll(fd_set* rfds, int max_fd) {
+  int r;
+#ifdef SELECT_BLOCK_IF_FD_CLOSED
+  struct timeval tv;
+  tv.tv_sec = 5;
+  tv.tv_usec = 0;
+#endif
+  while (true) {
+#ifdef SELECT_BLOCK_IF_FD_CLOSED
+    r = select(max_fd, rfds, nullptr, nullptr, &tv);
+#else
+    r = select(max_fd, rfds, nullptr, nullptr, nullptr);
+#endif
+    if (r < 0) {
+      if (errno == EAGAIN) {
+        sleep(1);
+        continue;
+      }
+      KLOGE(TAG, "select failed: %s", strerror(errno));
+    }
+    break;
+  }
+  return r;
+}
+
+static int unix_accept(int lfd) {
+  sockaddr_un addr;
+  socklen_t addr_len = sizeof(addr);
+  return accept(lfd, (sockaddr*)&addr, &addr_len);
+}
+
+static int tcp_accept(int lfd) {
+  sockaddr_in addr;
+  socklen_t addr_len = sizeof(addr);
+  return accept(lfd, (sockaddr*)&addr, &addr_len);
+}
+
+void SocketPoll::run() {
   fd_set all_fds;
   fd_set rfds;
-  sockaddr_un addr;
-  socklen_t addr_len;
   int new_fd;
   int max_fd;
   int lfd;
   AdapterMap::iterator adap_it;
   vector<int> pending_delete_adapters;
   size_t i;
+  int32_t r;
 
   start_mutex.lock();
   FD_ZERO(&all_fds);
@@ -70,24 +119,25 @@ void UnixPoll::run() {
   start_mutex.unlock();
   while (true) {
     rfds = all_fds;
-    if (select(max_fd, &rfds, nullptr, nullptr, nullptr) < 0) {
-      if (errno == EAGAIN) {
-        sleep(1);
-        continue;
-      }
-      KLOGE(TAG, "select failed: %s", strerror(errno));
+    r = do_poll(&rfds, max_fd);
+    // system call error
+    if (r < 0)
       break;
-    }
     // closed
     lfd = get_listen_fd();
     if (lfd < 0) {
       KLOGI(TAG, "unix poll closed, quit");
       break;
     }
+    // select timeout, this Poll not closed, continue
+    if (r == 0)
+      continue;
     // accept new connection
     if (FD_ISSET(lfd, &rfds)) {
-      addr_len = sizeof(addr);
-      new_fd = accept(lfd, (sockaddr*)&addr, &addr_len);
+      if (type == POLL_TYPE_TCP)
+        new_fd = tcp_accept(lfd);
+      else
+        new_fd = unix_accept(lfd);
       if (new_fd < 0) {
         KLOGE(TAG, "accept failed: %s", strerror(errno));
         continue;
@@ -121,7 +171,7 @@ void UnixPoll::run() {
   KLOGI(TAG, "unix poll: run thread quit");
 }
 
-bool UnixPoll::init_socket() {
+bool SocketPoll::init_unix_socket() {
   int fd = socket(PF_UNIX, SOCK_STREAM, 0);
   if (fd < 0)
     return false;
@@ -140,13 +190,41 @@ bool UnixPoll::init_socket() {
   return true;
 }
 
-void UnixPoll::new_adapter(int fd) {
+bool SocketPoll::init_tcp_socket() {
+  int fd = socket(PF_INET, SOCK_STREAM, 0);
+  if (fd < 0)
+    return false;
+  int v = 1;
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
+  struct sockaddr_in addr;
+  struct hostent* hp;
+  hp = gethostbyname(host.c_str());
+  if (hp == nullptr) {
+    KLOGE(TAG, "gethostbyname failed for host %s: %s", host.c_str(), strerror(errno));
+    ::close(fd);
+    return false;
+  }
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  memcpy(&addr.sin_addr, hp->h_addr_list[0], sizeof(addr.sin_addr));
+  addr.sin_port = htons(port);
+  if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+    ::close(fd);
+    KLOGE(TAG, "socket bind failed: %s", strerror(errno));
+    return false;
+  }
+  listen(fd, 10);
+  listen_fd = fd;
+  return true;
+}
+
+void SocketPoll::new_adapter(int fd) {
   shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd,
-      max_msg_size, 0);
+      max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0);
   adapters.insert(make_pair(fd, adap));
 }
 
-void UnixPoll::delete_adapter(int fd) {
+void SocketPoll::delete_adapter(int fd) {
   AdapterMap::iterator it = adapters.find(fd);
   if (it != adapters.end()) {
     ::close(fd);
@@ -155,7 +233,7 @@ void UnixPoll::delete_adapter(int fd) {
   }
 }
 
-bool UnixPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
+bool SocketPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
   int32_t r = adap->read();
   if (r != SOCK_ADAPTER_SUCCESS)
     return false;
@@ -179,7 +257,7 @@ bool UnixPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
   return true;
 }
 
-int UnixPoll::get_listen_fd() {
+int SocketPoll::get_listen_fd() {
   lock_guard<mutex> locker(start_mutex);
   return listen_fd;
 }

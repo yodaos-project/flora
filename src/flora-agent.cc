@@ -10,6 +10,10 @@ using namespace std::chrono;
 
 namespace flora {
 
+Agent::~Agent() {
+  close();
+}
+
 void Agent::config(uint32_t key, ...) {
   va_list ap;
   va_start(ap, key);
@@ -62,11 +66,13 @@ void Agent::start(bool block) {
     working = true;
     run();
   } else {
-    thread run_thread([this]() {
+    unique_lock<mutex> locker(conn_mutex);
+    run_thread = thread([this]() {
         working = true;
         this->run();
     });
-    run_thread.detach();
+    // wait run thread execute
+    conn_cond.wait(locker);
   }
 }
 
@@ -74,6 +80,9 @@ void Agent::run() {
   unique_lock<mutex> locker(conn_mutex);
   shared_ptr<Client> cli;
   int32_t r;
+
+  // notify 'Agent.start'
+  conn_cond.notify_one();
 
 	while (working) {
 		r = Client::connect(uri.c_str(), this, bufsize, cli);
@@ -99,10 +108,15 @@ void Agent::subscribe_msgs(shared_ptr<Client>& cli) {
 }
 
 void Agent::close() {
-  lock_guard<mutex> locker(conn_mutex);
-  working = false;
-  conn_cond.notify_one();
-  flora_cli.reset();
+  unique_lock<mutex> locker(conn_mutex);
+  if (working) {
+    working = false;
+    conn_cond.notify_one();
+    flora_cli.reset();
+    locker.unlock();
+    if (run_thread.joinable())
+      run_thread.join();
+  }
 }
 
 int32_t Agent::post(const char* name, shared_ptr<Caps>& msg, uint32_t msgtype) {

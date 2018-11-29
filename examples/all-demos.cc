@@ -3,6 +3,7 @@
 #include "rlog.h"
 
 #define SERVICE_URI "unix:flora.example.sock"
+// #define SERVICE_URI "tcp://0.0.0.0:37702/"
 
 using namespace std;
 using namespace flora;

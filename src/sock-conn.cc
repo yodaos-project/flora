@@ -5,12 +5,33 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include "tcp-conn.h"
+#include <sys/un.h>
+#include "sock-conn.h"
 #include "rlog.h"
 
-#define TAG "flora.TCPConn"
+#define TAG "flora.SocketConn"
 
-bool TCPConn::connect(const std::string& host, int32_t port) {
+bool SocketConn::connect(const std::string& name) {
+  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0) {
+    KLOGE(TAG, "socket create failed: %s", strerror(errno));
+    return false;
+  }
+  struct sockaddr_un addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strcpy(addr.sun_path, name.c_str());
+  if (::connect(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+    KLOGE(TAG, "socket connect %s failed: %s", name.c_str(),
+        strerror(errno));
+    ::close(fd);
+    return false;
+  }
+  sock = fd;
+  return true;
+}
+
+bool SocketConn::connect(const std::string& host, int32_t port) {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
@@ -37,7 +58,7 @@ bool TCPConn::connect(const std::string& host, int32_t port) {
   return true;
 }
 
-bool TCPConn::send(const void* data, uint32_t size) {
+bool SocketConn::send(const void* data, uint32_t size) {
   if (sock < 0)
     return false;
   ssize_t c = ::write(sock, data, size);
@@ -52,19 +73,27 @@ bool TCPConn::send(const void* data, uint32_t size) {
   return true;
 }
 
-int32_t TCPConn::recv(void* data, uint32_t size) {
+int32_t SocketConn::recv(void* data, uint32_t size) {
   if (sock < 0)
     return -1;
-  ssize_t c = ::read(sock, data, size);
-  if (c < 0) {
-    KLOGE(TAG, "read socket failed: %s", strerror(errno));
-  } else if (c == 0) {
-    KLOGE(TAG, "read socket failed: remote closed");
-  }
+  ssize_t c;
+  do {
+    c = ::read(sock, data, size);
+    if (c < 0) {
+      if (errno == EINTR) {
+        KLOGE(TAG, "read socket failed: %s", strerror(errno));
+        continue;
+      }
+      KLOGE(TAG, "read socket failed: %s", strerror(errno));
+    } else if (c == 0) {
+      KLOGE(TAG, "read socket failed: remote closed");
+    }
+    break;
+  } while (true);
   return c;
 }
 
-void TCPConn::close() {
+void SocketConn::close() {
   if (sock < 0)
     return;
   ::shutdown(sock, SHUT_RDWR);

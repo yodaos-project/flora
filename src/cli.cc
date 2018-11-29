@@ -4,8 +4,7 @@
 #include "cli.h"
 #include "uri.h"
 #include "rlog.h"
-#include "tcp-conn.h"
-#include "unix-conn.h"
+#include "sock-conn.h"
 #include "ser-helper.h"
 #include "defs.h"
 
@@ -60,22 +59,24 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
 	KLOGI(TAG, "uri parse: path = %s", urip.path.c_str());
 	KLOGI(TAG, "uri parse: fragment = %s", urip.fragment.c_str());
 
+  SocketConn* conn = new SocketConn();
 	if (urip.scheme == "unix") {
-		UnixConn* conn;
-		conn = new UnixConn();
-		if (!conn->connect(urip.path))
+		if (!conn->connect(urip.path)) {
+      delete conn;
 			return FLORA_CLI_ECONN;
-		connection.reset(conn);
+    }
+    connection.reset(conn);
     serialize_flags = 0;
 	} else if (urip.scheme == "tcp") {
-		TCPConn* conn;
-		conn = new TCPConn();
-		if (!conn->connect(urip.host, urip.port))
+		if (!conn->connect(urip.host, urip.port)) {
+      delete conn;
 			return FLORA_CLI_ECONN;
-		connection.reset(conn);
+    }
+    connection.reset(conn);
     serialize_flags = CAPS_FLAG_NET_BYTEORDER;
 	} else {
 		KLOGE(TAG, "unsupported uri scheme %s", urip.scheme.c_str());
+    delete conn;
 		return FLORA_CLI_EINVAL;
 	}
 	if (!auth(urip.fragment)) {
@@ -151,6 +152,7 @@ bool Client::handle_received(int32_t size) {
 			break;
 		if (Caps::parse(rbuffer + off, length, resp, false) != CAPS_SUCCESS)
 			return false;
+    KLOGI(TAG, "recv service data, %s", rbuffer[off] & 0x80 ? "net byteorder" : "no byteorder");
 		off += length;
 
 		if (resp->read(cmd) != CAPS_SUCCESS) {
