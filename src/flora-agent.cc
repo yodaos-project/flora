@@ -185,11 +185,13 @@ void Agent::destroy_client() {
 
 void Agent::recv_post(const char* name, uint32_t msgtype,
     shared_ptr<Caps>& msg) {
-  conn_mutex.lock();
+  unique_lock<mutex> locker(conn_mutex);
   MsgHandlerMap::iterator it = msg_handlers.find(name);
-  auto cb = it->second;
-  conn_mutex.unlock();
-  cb(msg, msgtype, nullptr);
+  if (it != msg_handlers.end()) {
+    auto cb = it->second;
+    locker.unlock();
+    cb(msg, msgtype, nullptr);
+  }
 }
 
 void Agent::recv_get(const char* name, shared_ptr<Caps>& msg, Reply& reply) {
