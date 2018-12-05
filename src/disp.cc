@@ -36,9 +36,6 @@ Dispatcher::~Dispatcher() noexcept {
 bool Dispatcher::put(Frame& frame, shared_ptr<Adapter>& sender) {
   shared_ptr<Caps> msg_caps;
 
-  KLOGI(TAG, "recv data from client %s, %s", sender->auth_extra.c_str(),
-      reinterpret_cast<uint8_t*>(frame.data)[0] & 0x80 ? "net byteorder" : "no byteorder");
-
   if (Caps::parse(frame.data, frame.size, msg_caps, false)
       != CAPS_SUCCESS) {
     KLOGE(TAG, "msg caps parse failed");

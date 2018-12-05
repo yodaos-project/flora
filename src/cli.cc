@@ -152,7 +152,6 @@ bool Client::handle_received(int32_t size) {
       break;
     if (Caps::parse(rbuffer + off, length, resp, false) != CAPS_SUCCESS)
       return false;
-    KLOGI(TAG, "recv service data, %s", rbuffer[off] & 0x80 ? "net byteorder" : "no byteorder");
     off += length;
 
     if (resp->read(cmd) != CAPS_SUCCESS) {
