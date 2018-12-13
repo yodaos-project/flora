@@ -1,7 +1,13 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.2)
 project(flora)
 set(VERSION 0.1)
+set(CMAKE_CXX_STANDARD 11)
 
+option(USE_GCC "force use gcc" OFF)
+if (USE_GCC)
+SET(CMAKE_C_COMPILER gcc)
+SET(CMAKE_CXX_COMPILER g++)
+endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
   set(COMPILER_IS_CLANG TRUE)
 else()
@@ -20,7 +26,7 @@ findPackage(mutils REQUIRED
   STATIC_LIBS misc
 )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 if (NOT COMPILER_IS_CLANG)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 endif()
