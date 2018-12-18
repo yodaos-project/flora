@@ -1,17 +1,17 @@
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/un.h>
 #include "sock-conn.h"
 #include "rlog.h"
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #define TAG "flora.SocketConn"
 
-bool SocketConn::connect(const std::string& name) {
+bool SocketConn::connect(const std::string &name) {
   int fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
@@ -21,9 +21,8 @@ bool SocketConn::connect(const std::string& name) {
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
   strcpy(addr.sun_path, name.c_str());
-  if (::connect(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-    KLOGE(TAG, "socket connect %s failed: %s", name.c_str(),
-        strerror(errno));
+  if (::connect(fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
+    KLOGE(TAG, "socket connect %s failed: %s", name.c_str(), strerror(errno));
     ::close(fd);
     return false;
   }
@@ -31,14 +30,14 @@ bool SocketConn::connect(const std::string& name) {
   return true;
 }
 
-bool SocketConn::connect(const std::string& host, int32_t port) {
+bool SocketConn::connect(const std::string &host, int32_t port) {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
     return false;
   }
   struct sockaddr_in addr;
-  struct hostent* hp;
+  struct hostent *hp;
   hp = gethostbyname(host.c_str());
   if (hp == nullptr) {
     KLOGE(TAG, "dns failed for host %s: %s", host.c_str(), strerror(errno));
@@ -49,7 +48,7 @@ bool SocketConn::connect(const std::string& host, int32_t port) {
   addr.sin_family = AF_INET;
   memcpy(&addr.sin_addr, hp->h_addr_list[0], sizeof(addr.sin_addr));
   addr.sin_port = htons(port);
-  if (::connect(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (::connect(fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
     KLOGE(TAG, "socket connect failed: %s", strerror(errno));
     ::close(fd);
     return false;
@@ -58,7 +57,7 @@ bool SocketConn::connect(const std::string& host, int32_t port) {
   return true;
 }
 
-bool SocketConn::send(const void* data, uint32_t size) {
+bool SocketConn::send(const void *data, uint32_t size) {
   if (sock < 0)
     return false;
   ssize_t c = ::write(sock, data, size);
@@ -73,7 +72,7 @@ bool SocketConn::send(const void* data, uint32_t size) {
   return true;
 }
 
-int32_t SocketConn::recv(void* data, uint32_t size) {
+int32_t SocketConn::recv(void *data, uint32_t size) {
   if (sock < 0)
     return -1;
   ssize_t c;

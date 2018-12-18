@@ -4,7 +4,7 @@
 #include <string>
 
 typedef struct {
-  void* data;
+  void *data;
   uint32_t size;
 } Frame;
 
@@ -16,9 +16,9 @@ public:
 
   virtual int32_t read() = 0;
 
-  virtual int32_t next_frame(Frame& frame) = 0;
+  virtual int32_t next_frame(Frame &frame) = 0;
 
-  virtual void write(const void* data, uint32_t size) = 0;
+  virtual void write(const void *data, uint32_t size) = 0;
 
   virtual void close() = 0;
 

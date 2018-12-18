@@ -1,12 +1,12 @@
-#include <sys/mman.h>
-#include <string.h>
-#include <assert.h>
 #include "cli.h"
-#include "uri.h"
-#include "rlog.h"
-#include "sock-conn.h"
-#include "ser-helper.h"
 #include "defs.h"
+#include "rlog.h"
+#include "ser-helper.h"
+#include "sock-conn.h"
+#include "uri.h"
+#include <assert.h>
+#include <string.h>
+#include <sys/mman.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -14,11 +14,13 @@ using rokid::Uri;
 
 #define TAG "flora.Client"
 
-int32_t flora::Client::connect(const char* uri, flora::ClientCallback* cb,
-    uint32_t msg_buf_size, shared_ptr<flora::Client>& result) {
-  uint32_t bufsize = msg_buf_size > DEFAULT_MSG_BUF_SIZE ?
-    msg_buf_size : DEFAULT_MSG_BUF_SIZE;
-  shared_ptr<flora::internal::Client> cli = make_shared<flora::internal::Client>(bufsize);
+int32_t flora::Client::connect(const char *uri, flora::ClientCallback *cb,
+                               uint32_t msg_buf_size,
+                               shared_ptr<flora::Client> &result) {
+  uint32_t bufsize =
+      msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
+  shared_ptr<flora::internal::Client> cli =
+      make_shared<flora::internal::Client>(bufsize);
   int32_t r = cli->connect(uri, cb);
   if (r != FLORA_CLI_SUCCESS)
     return r;
@@ -30,8 +32,8 @@ namespace flora {
 namespace internal {
 
 Client::Client(uint32_t bufsize) : buf_size(bufsize) {
-  sbuffer = (int8_t*)mmap(NULL, buf_size * 2, PROT_READ | PROT_WRITE,
-      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  sbuffer = (int8_t *)mmap(NULL, buf_size * 2, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   rbuffer = sbuffer + buf_size;
 }
 
@@ -40,14 +42,14 @@ Client::~Client() noexcept {
 
   munmap(sbuffer, buf_size * 2);
 #ifdef FLORA_DEBUG
-  KLOGI(TAG, "client %s: post %u times, post %u bytes, "
-      "send %u times, send %u bytes",
-      auth_extra.c_str(), post_times, post_bytes,
-      send_times, send_bytes);
+  KLOGI(TAG,
+        "client %s: post %u times, post %u bytes, "
+        "send %u times, send %u bytes",
+        auth_extra.c_str(), post_times, post_bytes, send_times, send_bytes);
 #endif
 }
 
-int32_t Client::connect(const char* uri, ClientCallback* cb) {
+int32_t Client::connect(const char *uri, ClientCallback *cb) {
   if (uri == nullptr)
     return FLORA_CLI_EINVAL;
 
@@ -59,7 +61,7 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
   KLOGI(TAG, "uri parse: path = %s", urip.path.c_str());
   KLOGI(TAG, "uri parse: fragment = %s", urip.fragment.c_str());
 
-  SocketConn* conn = new SocketConn();
+  SocketConn *conn = new SocketConn();
   if (urip.scheme == "unix") {
     if (!conn->connect(urip.path)) {
       delete conn;
@@ -90,9 +92,9 @@ int32_t Client::connect(const char* uri, ClientCallback* cb) {
   return FLORA_CLI_SUCCESS;
 }
 
-bool Client::auth(const string& extra) {
-  int32_t c = RequestSerializer::serialize_auth(FLORA_VERSION,
-      extra.c_str(), sbuffer, buf_size, serialize_flags);
+bool Client::auth(const string &extra) {
+  int32_t c = RequestSerializer::serialize_auth(
+      FLORA_VERSION, extra.c_str(), sbuffer, buf_size, serialize_flags);
   if (c <= 0)
     return false;
   if (!connection->send(sbuffer, c))
@@ -158,72 +160,72 @@ bool Client::handle_received(int32_t size) {
       return false;
     }
     switch (cmd) {
-      case CMD_POST_RESP: {
-        uint32_t msgtype;
-        string name;
-        int32_t msgid;
-        shared_ptr<Caps> args;
+    case CMD_POST_RESP: {
+      uint32_t msgtype;
+      string name;
+      int32_t msgid;
+      shared_ptr<Caps> args;
 
-        if (ResponseParser::parse_post(resp, name, msgtype, args, msgid) != 0) {
-          return false;
-        }
-        if (callback) {
-          if (msgtype == FLORA_MSGTYPE_REQUEST) {
-            Reply reply;
-            callback->recv_get(name.c_str(), args, reply);
-            int32_t c = RequestSerializer::serialize_reply(
-                name.c_str(), reply.data, msgid, reply.ret_code, sbuffer,
-                buf_size, serialize_flags);
-            if (!connection->send(sbuffer, c))
-              return false;
-#ifdef FLORA_DEBUG
-            send_bytes += c;
-            ++send_times;
-#endif
-          } else {
-            callback->recv_post(name.c_str(), msgtype, args);
-          }
-        }
-        break;
-      }
-      case CMD_REPLY_RESP: {
-        string name;
-        int32_t msgid;
-        PendingRequestList::iterator it;
-
-        req_mutex.lock();
-        if (resp->read(msgid) != CAPS_SUCCESS) {
-          req_mutex.unlock();
-          return false;
-        }
-
-        for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
-          if ((*it).id == msgid) {
-            if ((*it).results) {
-              if (ResponseParser::parse_reply(resp, name, *(*it).results) != 0) {
-                KLOGW(TAG, "parse reply failed");
-              }
-              (*it).id = -1;
-              req_reply_cond.notify_all();
-            } else {
-              ResponseArray results;
-              if (ResponseParser::parse_reply(resp, name, results) != 0) {
-                KLOGW(TAG, "parse reply failed");
-              }
-              req_mutex.unlock();
-              (*it).callback(results);
-              req_mutex.lock();
-              pending_requests.erase(it);
-            }
-            break;
-          }
-        }
-        req_mutex.unlock();
-        break;
-      }
-      default:
-        KLOGE(TAG, "client received invalid command %d", cmd);
+      if (ResponseParser::parse_post(resp, name, msgtype, args, msgid) != 0) {
         return false;
+      }
+      if (callback) {
+        if (msgtype == FLORA_MSGTYPE_REQUEST) {
+          Reply reply;
+          callback->recv_get(name.c_str(), args, reply);
+          int32_t c = RequestSerializer::serialize_reply(
+              name.c_str(), reply.data, msgid, reply.ret_code, sbuffer,
+              buf_size, serialize_flags);
+          if (!connection->send(sbuffer, c))
+            return false;
+#ifdef FLORA_DEBUG
+          send_bytes += c;
+          ++send_times;
+#endif
+        } else {
+          callback->recv_post(name.c_str(), msgtype, args);
+        }
+      }
+      break;
+    }
+    case CMD_REPLY_RESP: {
+      string name;
+      int32_t msgid;
+      PendingRequestList::iterator it;
+
+      req_mutex.lock();
+      if (resp->read(msgid) != CAPS_SUCCESS) {
+        req_mutex.unlock();
+        return false;
+      }
+
+      for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
+        if ((*it).id == msgid) {
+          if ((*it).results) {
+            if (ResponseParser::parse_reply(resp, name, *(*it).results) != 0) {
+              KLOGW(TAG, "parse reply failed");
+            }
+            (*it).id = -1;
+            req_reply_cond.notify_all();
+          } else {
+            ResponseArray results;
+            if (ResponseParser::parse_reply(resp, name, results) != 0) {
+              KLOGW(TAG, "parse reply failed");
+            }
+            req_mutex.unlock();
+            (*it).callback(results);
+            req_mutex.lock();
+            pending_requests.erase(it);
+          }
+          break;
+        }
+      }
+      req_mutex.unlock();
+      break;
+    }
+    default:
+      KLOGE(TAG, "client received invalid command %d", cmd);
+      return false;
     }
   }
   if (off > 0 && size - off > 0) {
@@ -254,11 +256,11 @@ void Client::close(bool passive) {
     recv_thread.join();
 }
 
-int32_t Client::subscribe(const char* name) {
+int32_t Client::subscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  int32_t c = RequestSerializer::serialize_subscribe(name,
-      sbuffer, buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_subscribe(name, sbuffer, buf_size,
+                                                     serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   cli_mutex.lock();
@@ -274,11 +276,11 @@ int32_t Client::subscribe(const char* name) {
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::unsubscribe(const char* name) {
+int32_t Client::unsubscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  int32_t c = RequestSerializer::serialize_unsubscribe(name,
-      sbuffer, buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_unsubscribe(name, sbuffer, buf_size,
+                                                       serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   cli_mutex.lock();
@@ -294,13 +296,13 @@ int32_t Client::unsubscribe(const char* name) {
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::post(const char* name, shared_ptr<Caps>& msg,
-    uint32_t msgtype) {
-  if (name == nullptr || !is_valid_msgtype(msgtype)
-      || msgtype == FLORA_MSGTYPE_REQUEST)
+int32_t Client::post(const char *name, shared_ptr<Caps> &msg,
+                     uint32_t msgtype) {
+  if (name == nullptr || !is_valid_msgtype(msgtype) ||
+      msgtype == FLORA_MSGTYPE_REQUEST)
     return FLORA_CLI_EINVAL;
-  int32_t c = RequestSerializer::serialize_post(name, msgtype, msg,
-      0, 0, sbuffer, buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_post(
+      name, msgtype, msg, 0, 0, sbuffer, buf_size, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   cli_mutex.lock();
@@ -318,18 +320,20 @@ int32_t Client::post(const char* name, shared_ptr<Caps>& msg,
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
-    ResponseArray& replys, uint32_t timeout) {
+int32_t Client::get(const char *name, shared_ptr<Caps> &msg,
+                    ResponseArray &replys, uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
   int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
-      msg, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
+                                                msg, ++reqseq, timeout, sbuffer,
+                                                buf_size, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   replys.clear();
 
   unique_lock<mutex> locker(req_mutex);
-  PendingRequestList::iterator it = pending_requests.emplace(pending_requests.end());
+  PendingRequestList::iterator it =
+      pending_requests.emplace(pending_requests.end());
   (*it).id = reqseq;
   (*it).results = &replys;
   if (timeout == 0)
@@ -384,17 +388,19 @@ exit:
   return retcode;
 }
 
-int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
-    function<void(ResponseArray&)>& cb) {
+int32_t Client::get(const char *name, shared_ptr<Caps> &msg,
+                    function<void(ResponseArray &)> &cb) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
   int32_t c = RequestSerializer::serialize_post(name, FLORA_MSGTYPE_REQUEST,
-      msg, ++reqseq, 0, sbuffer, buf_size, serialize_flags);
+                                                msg, ++reqseq, 0, sbuffer,
+                                                buf_size, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
 
   unique_lock<mutex> locker(req_mutex);
-  PendingRequestList::iterator it = pending_requests.emplace(pending_requests.end());
+  PendingRequestList::iterator it =
+      pending_requests.emplace(pending_requests.end());
   (*it).id = reqseq;
   (*it).results = nullptr;
   (*it).callback = cb;
@@ -413,33 +419,31 @@ int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::get(const char* name, shared_ptr<Caps>& msg,
-    function<void(ResponseArray&)>&& cb) {
+int32_t Client::get(const char *name, shared_ptr<Caps> &msg,
+                    function<void(ResponseArray &)> &&cb) {
   return get(name, msg, cb);
 }
 
 } // namespace internal
 } // namespace flora
 
-using flora::internal::Client;
-using flora::ResponseArray;
 using flora::Reply;
+using flora::ResponseArray;
+using flora::internal::Client;
 class WrapClientCallback : public flora::ClientCallback {
 public:
-  void recv_post(const char* name, uint32_t msgtype,
-      shared_ptr<Caps>& msg);
+  void recv_post(const char *name, uint32_t msgtype, shared_ptr<Caps> &msg);
 
-  void recv_get(const char* name, shared_ptr<Caps>& msg,
-      Reply& reply);
+  void recv_get(const char *name, shared_ptr<Caps> &msg, Reply &reply);
 
   void disconnected();
 
   flora_cli_callback_t cb_funcs;
-  void* arg;
+  void *arg;
 };
 
-void WrapClientCallback::recv_post(const char* name, uint32_t msgtype,
-    shared_ptr<Caps>& msg) {
+void WrapClientCallback::recv_post(const char *name, uint32_t msgtype,
+                                   shared_ptr<Caps> &msg) {
   if (cb_funcs.recv_post) {
     caps_t cmsg = Caps::convert(msg);
     cb_funcs.recv_post(name, msgtype, cmsg, arg);
@@ -447,8 +451,8 @@ void WrapClientCallback::recv_post(const char* name, uint32_t msgtype,
   }
 }
 
-void WrapClientCallback::recv_get(const char* name, shared_ptr<Caps>& msg,
-    Reply& reply) {
+void WrapClientCallback::recv_get(const char *name, shared_ptr<Caps> &msg,
+                                  Reply &reply) {
   if (cb_funcs.recv_get) {
     caps_t cmsg = Caps::convert(msg);
     caps_t creply = 0;
@@ -465,17 +469,17 @@ void WrapClientCallback::disconnected() {
   }
 }
 
-int32_t flora_cli_connect(const char* uri, flora_cli_callback_t* cb,
-    void* arg, uint32_t msg_buf_size, flora_cli_t* result) {
+int32_t flora_cli_connect(const char *uri, flora_cli_callback_t *cb, void *arg,
+                          uint32_t msg_buf_size, flora_cli_t *result) {
   if (result == nullptr)
     return FLORA_CLI_EINVAL;
 
-  uint32_t bufsize = msg_buf_size > DEFAULT_MSG_BUF_SIZE ?
-    msg_buf_size : DEFAULT_MSG_BUF_SIZE;
-  Client* cli = new Client(bufsize);
+  uint32_t bufsize =
+      msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
+  Client *cli = new Client(bufsize);
   int32_t r;
 
-  WrapClientCallback* wcb = nullptr;
+  WrapClientCallback *wcb = nullptr;
   if (cb) {
     wcb = new WrapClientCallback();
     wcb->cb_funcs = *cb;
@@ -493,7 +497,7 @@ int32_t flora_cli_connect(const char* uri, flora_cli_callback_t* cb,
 
 void flora_cli_delete(flora_cli_t handle) {
   if (handle) {
-    Client* cli = reinterpret_cast<Client*>(handle);
+    Client *cli = reinterpret_cast<Client *>(handle);
     cli->close(false);
     if (cli->callback)
       delete cli->callback;
@@ -501,28 +505,29 @@ void flora_cli_delete(flora_cli_t handle) {
   }
 }
 
-int32_t flora_cli_subscribe(flora_cli_t handle, const char* name) {
+int32_t flora_cli_subscribe(flora_cli_t handle, const char *name) {
   if (handle == 0)
     return FLORA_CLI_EINVAL;
-  return reinterpret_cast<Client*>(handle)->subscribe(name);
+  return reinterpret_cast<Client *>(handle)->subscribe(name);
 }
 
-int32_t flora_cli_unsubscribe(flora_cli_t handle, const char* name) {
+int32_t flora_cli_unsubscribe(flora_cli_t handle, const char *name) {
   if (handle == 0)
     return FLORA_CLI_EINVAL;
-  return reinterpret_cast<Client*>(handle)->unsubscribe(name);
+  return reinterpret_cast<Client *>(handle)->unsubscribe(name);
 }
 
-int32_t flora_cli_post(flora_cli_t handle, const char* name, caps_t msg, uint32_t msgtype) {
+int32_t flora_cli_post(flora_cli_t handle, const char *name, caps_t msg,
+                       uint32_t msgtype) {
   if (handle == 0)
     return FLORA_CLI_EINVAL;
   shared_ptr<Caps> pmsg = Caps::convert(msg);
-  return reinterpret_cast<Client*>(handle)->post(name, pmsg, msgtype);
+  return reinterpret_cast<Client *>(handle)->post(name, pmsg, msgtype);
 }
 
-void cxxreplys_to_creplys(ResponseArray& replys, flora_get_result* results) {
+void cxxreplys_to_creplys(ResponseArray &replys, flora_get_result *results) {
   size_t i;
-  string* extra;
+  string *extra;
 
   for (i = 0; i < replys.size(); ++i) {
     results[i].ret_code = replys[i].ret_code;
@@ -536,13 +541,15 @@ void cxxreplys_to_creplys(ResponseArray& replys, flora_get_result* results) {
   }
 }
 
-int32_t flora_cli_get(flora_cli_t handle, const char* name, caps_t msg,
-    flora_get_result** results, uint32_t* res_buf_size, uint32_t timeout) {
+int32_t flora_cli_get(flora_cli_t handle, const char *name, caps_t msg,
+                      flora_get_result **results, uint32_t *res_buf_size,
+                      uint32_t timeout) {
   if (handle == 0)
     return FLORA_CLI_EINVAL;
   ResponseArray resarr;
   shared_ptr<Caps> pmsg = Caps::convert(msg);
-  int32_t r = reinterpret_cast<Client*>(handle)->get(name, pmsg, resarr, timeout);
+  int32_t r =
+      reinterpret_cast<Client *>(handle)->get(name, pmsg, resarr, timeout);
   if (r != FLORA_CLI_SUCCESS)
     return r;
   if (results == nullptr || res_buf_size == nullptr)
@@ -554,7 +561,7 @@ int32_t flora_cli_get(flora_cli_t handle, const char* name, caps_t msg,
   return FLORA_CLI_SUCCESS;
 }
 
-void flora_result_delete(flora_get_result* results, uint32_t size) {
+void flora_result_delete(flora_get_result *results, uint32_t size) {
   if (results == nullptr || size == 0)
     return;
 
@@ -568,20 +575,19 @@ void flora_result_delete(flora_get_result* results, uint32_t size) {
   delete[] results;
 }
 
-int32_t flora_cli_get_nb(flora_cli_t handle, const char* name, caps_t msg,
-    flora_get_callback_t cb) {
+int32_t flora_cli_get_nb(flora_cli_t handle, const char *name, caps_t msg,
+                         flora_get_callback_t cb) {
   if (handle == 0)
     return FLORA_CLI_EINVAL;
   shared_ptr<Caps> pmsg = Caps::convert(msg);
-  int32_t r = reinterpret_cast<Client*>(handle)->get(name, pmsg,
-      [cb](ResponseArray& replys) {
+  int32_t r = reinterpret_cast<Client *>(handle)->get(
+      name, pmsg, [cb](ResponseArray &replys) {
         if (cb) {
-          flora_get_result* results = new flora_get_result[replys.size()];
+          flora_get_result *results = new flora_get_result[replys.size()];
           cxxreplys_to_creplys(replys, results);
           cb(results, replys.size());
           flora_result_delete(results, replys.size());
         }
-      }
-  );
+      });
   return r;
 }

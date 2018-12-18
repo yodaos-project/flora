@@ -1,17 +1,17 @@
-#include <unistd.h>
+#include "sock-adap.h"
+#include "caps.h"
+#include "rlog.h"
+#include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <errno.h>
-#include "sock-adap.h"
-#include "rlog.h"
-#include "caps.h"
+#include <unistd.h>
 
 #define TAG "flora.SocketAdapter"
 
 SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
     : Adapter(flags), socket(sock) {
-  buffer = (int8_t*)mmap(NULL, bufsize, PROT_READ | PROT_WRITE,
-      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  buffer = (int8_t *)mmap(NULL, bufsize, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   buf_size = bufsize;
 }
 
@@ -19,7 +19,7 @@ SocketAdapter::~SocketAdapter() {
   close();
 #ifdef FLORA_DEBUG
   KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
-      auth_extra.c_str(), recv_times, recv_bytes);
+        auth_extra.c_str(), recv_times, recv_bytes);
 #endif
 }
 
@@ -42,7 +42,7 @@ int32_t SocketAdapter::read() {
   return SOCK_ADAPTER_SUCCESS;
 }
 
-int32_t SocketAdapter::next_frame(Frame& frame) {
+int32_t SocketAdapter::next_frame(Frame &frame) {
   if (buffer == nullptr)
     return SOCK_ADAPTER_ECLOSED;
   uint32_t sz = cur_size - frame_begin;
@@ -50,7 +50,8 @@ int32_t SocketAdapter::next_frame(Frame& frame) {
     goto nomore;
   uint32_t version;
   uint32_t length;
-  if (Caps::binary_info(buffer + frame_begin, &version, &length) != CAPS_SUCCESS)
+  if (Caps::binary_info(buffer + frame_begin, &version, &length) !=
+      CAPS_SUCCESS)
     return SOCK_ADAPTER_EPROTO;
   if (length > buf_size)
     return SOCK_ADAPTER_ENOBUF;
@@ -80,11 +81,9 @@ void SocketAdapter::close() {
   }
 }
 
-bool SocketAdapter::closed() const {
-  return buffer == nullptr;
-}
+bool SocketAdapter::closed() const { return buffer == nullptr; }
 
-void SocketAdapter::write(const void* data, uint32_t size) {
+void SocketAdapter::write(const void *data, uint32_t size) {
   if (buffer == nullptr)
     return;
   if (::write(socket, data, size) < 0) {

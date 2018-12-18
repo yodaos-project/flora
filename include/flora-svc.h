@@ -24,11 +24,11 @@ class Poll {
 public:
   virtual ~Poll() = default;
 
-  virtual int32_t start(std::shared_ptr<Dispatcher>& dispathcer) = 0;
+  virtual int32_t start(std::shared_ptr<Dispatcher> &dispathcer) = 0;
 
   virtual void stop() = 0;
 
-  static std::shared_ptr<Poll> new_instance(const char* uri);
+  static std::shared_ptr<Poll> new_instance(const char *uri);
 };
 
 } // namespace flora
@@ -38,7 +38,8 @@ extern "C" {
 
 typedef intptr_t flora_poll_t;
 typedef intptr_t flora_dispatcher_t;
-typedef void(*flora_received_func_t)(flora_dispatcher_t handle, const char* name, caps_t msg, void* arg);
+typedef void (*flora_received_func_t)(flora_dispatcher_t handle,
+                                      const char *name, caps_t msg, void *arg);
 
 // --flora dispatcher functions--
 // 消息转发
@@ -47,11 +48,13 @@ flora_dispatcher_t flora_dispatcher_new(uint32_t msg_buf_size);
 
 void flora_dispatcher_delete(flora_dispatcher_t handle);
 
-void flora_dispatcher_forward_msg(flora_dispatcher_t handle, const char* name, caps_t msg);
+void flora_dispatcher_forward_msg(flora_dispatcher_t handle, const char *name,
+                                  caps_t msg);
 
-void flora_dispatcher_subscribe(flora_dispatcher_t handle, const char* name, flora_received_func_t callback, void* arg);
+void flora_dispatcher_subscribe(flora_dispatcher_t handle, const char *name,
+                                flora_received_func_t callback, void *arg);
 
-void flora_dispatcher_unsubscribe(flora_dispatcher_t handle, const char* name);
+void flora_dispatcher_unsubscribe(flora_dispatcher_t handle, const char *name);
 
 // --flora poll functions--
 // 侦听连接
@@ -65,7 +68,7 @@ void flora_dispatcher_unsubscribe(flora_dispatcher_t handle, const char* name);
 //      SUCESS
 //      INVAL: uri参数不合法
 //      UNSUPP: uri指定的协议不支持
-int32_t flora_poll_new(const char* uri, flora_poll_t* result);
+int32_t flora_poll_new(const char *uri, flora_poll_t *result);
 
 void flora_poll_delete(flora_poll_t handle);
 

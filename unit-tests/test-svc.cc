@@ -1,6 +1,6 @@
 #include "test-svc.h"
 
-bool TestService::run(const char* uri, bool capi) {
+bool TestService::run(const char *uri, bool capi) {
   use_c_api = capi;
   if (capi) {
     c_dispatcher = flora_dispatcher_new(0);

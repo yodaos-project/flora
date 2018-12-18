@@ -1,6 +1,6 @@
-#include <unistd.h>
 #include "all-demos.h"
 #include "rlog.h"
+#include <unistd.h>
 
 #define SERVICE_URI "unix:flora.example.sock"
 // #define SERVICE_URI "tcp://0.0.0.0:37702/"
@@ -20,23 +20,21 @@ void DemoAllInOne::start_service() {
   poll->start(dispatcher);
 }
 
-void DemoAllInOne::stop_service() {
-  poll->stop();
-}
+void DemoAllInOne::stop_service() { poll->stop(); }
 
 void DemoAllInOne::run_start_stop_service() {
   start_service();
   stop_service();
 }
 
-static void config_agent(Agent& agent, char id) {
+static void config_agent(Agent &agent, char id) {
   char buf[64];
   snprintf(buf, sizeof(buf), "%s#%c", SERVICE_URI, id);
   agent.config(FLORA_AGENT_CONFIG_URI, buf);
   agent.start();
 }
 
-static void create_cagent(flora_agent_t* agent, char id) {
+static void create_cagent(flora_agent_t *agent, char id) {
   char buf[64];
   snprintf(buf, sizeof(buf), "%s#c-%c", SERVICE_URI, id);
   *agent = flora_agent_create();
@@ -49,36 +47,38 @@ static void delete_cagent(flora_agent_t agent) {
   flora_agent_delete(agent);
 }
 
-static void print_responses(const char* prefix, ResponseArray& resps) {
+static void print_responses(const char *prefix, ResponseArray &resps) {
   KLOGI(TAG, "%s: response num %d", prefix, resps.size());
   size_t i;
   int32_t iv;
   for (i = 0; i < resps.size(); ++i) {
     iv = -1;
     resps[i].data->read(iv);
-    KLOGI(TAG, "%d: ret %d, value %d, from %s", i, resps[i].ret_code,
-        iv, resps[i].extra.c_str());
+    KLOGI(TAG, "%d: ret %d, value %d, from %s", i, resps[i].ret_code, iv,
+          resps[i].extra.c_str());
   }
 }
 
-static void print_c_responses(const char* prefix, flora_get_result* results, uint32_t size) {
+static void print_c_responses(const char *prefix, flora_get_result *results,
+                              uint32_t size) {
   KLOGI(TAG, "%s: response num %d", prefix, size);
   uint32_t i;
   int32_t iv;
   for (i = 0; i < size; ++i) {
     iv = -1;
     caps_read_integer(results[i].data, &iv);
-    KLOGI(TAG, "%d: ret %d, value %d, from %s", i, results[i].ret_code,
-        iv, results[i].extra);
+    KLOGI(TAG, "%d: ret %d, value %d, from %s", i, results[i].ret_code, iv,
+          results[i].extra);
   }
 }
 
-static void exam_get_callback(flora_get_result* results, uint32_t size, void* arg) {
+static void exam_get_callback(flora_get_result *results, uint32_t size,
+                              void *arg) {
   print_c_responses("callback get", results, size);
   flora_result_delete(results, size);
 }
 
-static void agent_post(Agent& agent, flora_agent_t cagent) {
+static void agent_post(Agent &agent, flora_agent_t cagent) {
   shared_ptr<Caps> msg;
   ResponseArray resps;
   agent.post("0", msg, FLORA_MSGTYPE_INSTANT);
@@ -87,15 +87,15 @@ static void agent_post(Agent& agent, flora_agent_t cagent) {
   agent.post("1", msg, FLORA_MSGTYPE_PERSIST);
   agent.get("2", msg, resps);
   print_responses("blocking get", resps);
-  agent.get("3", msg, [](ResponseArray& resps) {
-      print_responses("callback get", resps);
-    });
+  agent.get("3", msg, [](ResponseArray &resps) {
+    print_responses("callback get", resps);
+  });
 
   flora_agent_post(cagent, "0", 0, FLORA_MSGTYPE_INSTANT);
   caps_t cmsg = caps_create();
   caps_write_integer(cmsg, 1);
   flora_agent_post(cagent, "1", cmsg, FLORA_MSGTYPE_INSTANT);
-  flora_get_result* results;
+  flora_get_result *results;
   uint32_t result_size;
   int32_t r = flora_agent_get(cagent, "2", cmsg, &results, &result_size, 0);
   if (r == FLORA_CLI_SUCCESS) {
@@ -120,64 +120,65 @@ void DemoAllInOne::run_post_msg() {
   stop_service();
 }
 
-static void exam_subscribe_callback(caps_t msg, uint32_t type, flora_reply_t* reply, void* arg) {
+static void exam_subscribe_callback(caps_t msg, uint32_t type,
+                                    flora_reply_t *reply, void *arg) {
   int32_t iv = -1;
 
   switch ((intptr_t)arg) {
-    case 0:
-      KLOGI(TAG, "recv msg 0, type %u, content %p", type, msg);
-      break;
-    case 1:
-      caps_read_integer(msg, &iv);
-      KLOGI(TAG, "recv msg 1, type %u, content %d", type, iv);
-      break;
-    case 2:
-      caps_read_integer(msg, &iv);
-      KLOGI(TAG, "recv msg 2, type %u, content %d", type, iv);
-      reply->ret_code = FLORA_CLI_SUCCESS;
-      reply->data = caps_create();
-      caps_write_integer(reply->data, 2);
-      break;
-    case 3:
-      caps_read_integer(msg, &iv);
-      KLOGI(TAG, "recv msg 3, type %u, content %d", type, iv);
-      reply->ret_code = FLORA_CLI_SUCCESS;
-      reply->data = caps_create();
-      caps_write_integer(reply->data, 3);
-      break;
+  case 0:
+    KLOGI(TAG, "recv msg 0, type %u, content %p", type, msg);
+    break;
+  case 1:
+    caps_read_integer(msg, &iv);
+    KLOGI(TAG, "recv msg 1, type %u, content %d", type, iv);
+    break;
+  case 2:
+    caps_read_integer(msg, &iv);
+    KLOGI(TAG, "recv msg 2, type %u, content %d", type, iv);
+    reply->ret_code = FLORA_CLI_SUCCESS;
+    reply->data = caps_create();
+    caps_write_integer(reply->data, 2);
+    break;
+  case 3:
+    caps_read_integer(msg, &iv);
+    KLOGI(TAG, "recv msg 3, type %u, content %d", type, iv);
+    reply->ret_code = FLORA_CLI_SUCCESS;
+    reply->data = caps_create();
+    caps_write_integer(reply->data, 3);
+    break;
   }
 }
 
-static void agent_subscribe(Agent& agent, flora_agent_t cagent) {
-  agent.subscribe("0", [](shared_ptr<Caps>& msg, uint32_t type, Reply*) {
-      KLOGI(TAG, "recv msg 0, type %u, content %p", type, msg.get());
-    });
-  agent.subscribe("1", [](shared_ptr<Caps>& msg, uint32_t type, Reply*) {
-      int32_t iv = -1;
-      msg->read(iv);
-      KLOGI(TAG, "recv msg 1, type %u, content %d", type, iv);
-    });
-  agent.subscribe("2", [](shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
-      int32_t iv = -1;
-      msg->read(iv);
-      KLOGI(TAG, "recv msg 2, type %u, content %d", type, iv);
-      reply->ret_code = FLORA_CLI_SUCCESS;
-      reply->data = Caps::new_instance();
-      reply->data->write(2);
-    });
-  agent.subscribe("3", [](shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
-      int32_t iv = -1;
-      msg->read(iv);
-      KLOGI(TAG, "recv msg 3, type %u, content %d", type, iv);
-      reply->ret_code = FLORA_CLI_SUCCESS;
-      reply->data = Caps::new_instance();
-      reply->data->write(3);
-    });
+static void agent_subscribe(Agent &agent, flora_agent_t cagent) {
+  agent.subscribe("0", [](shared_ptr<Caps> &msg, uint32_t type, Reply *) {
+    KLOGI(TAG, "recv msg 0, type %u, content %p", type, msg.get());
+  });
+  agent.subscribe("1", [](shared_ptr<Caps> &msg, uint32_t type, Reply *) {
+    int32_t iv = -1;
+    msg->read(iv);
+    KLOGI(TAG, "recv msg 1, type %u, content %d", type, iv);
+  });
+  agent.subscribe("2", [](shared_ptr<Caps> &msg, uint32_t type, Reply *reply) {
+    int32_t iv = -1;
+    msg->read(iv);
+    KLOGI(TAG, "recv msg 2, type %u, content %d", type, iv);
+    reply->ret_code = FLORA_CLI_SUCCESS;
+    reply->data = Caps::new_instance();
+    reply->data->write(2);
+  });
+  agent.subscribe("3", [](shared_ptr<Caps> &msg, uint32_t type, Reply *reply) {
+    int32_t iv = -1;
+    msg->read(iv);
+    KLOGI(TAG, "recv msg 3, type %u, content %d", type, iv);
+    reply->ret_code = FLORA_CLI_SUCCESS;
+    reply->data = Caps::new_instance();
+    reply->data->write(3);
+  });
 
-  flora_agent_subscribe(cagent, "0", exam_subscribe_callback, (void*)0);
-  flora_agent_subscribe(cagent, "1", exam_subscribe_callback, (void*)1);
-  flora_agent_subscribe(cagent, "2", exam_subscribe_callback, (void*)2);
-  flora_agent_subscribe(cagent, "3", exam_subscribe_callback, (void*)3);
+  flora_agent_subscribe(cagent, "0", exam_subscribe_callback, (void *)0);
+  flora_agent_subscribe(cagent, "1", exam_subscribe_callback, (void *)1);
+  flora_agent_subscribe(cagent, "2", exam_subscribe_callback, (void *)2);
+  flora_agent_subscribe(cagent, "3", exam_subscribe_callback, (void *)3);
 }
 
 void DemoAllInOne::run_recv_msg() {

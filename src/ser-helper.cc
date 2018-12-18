@@ -6,8 +6,9 @@ using namespace std;
 namespace flora {
 namespace internal {
 
-int32_t RequestSerializer::serialize_auth(uint32_t version,
-    const char* extra, void* data, uint32_t size, uint32_t flags) {
+int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra,
+                                          void *data, uint32_t size,
+                                          uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_REQ);
   caps->write((int32_t)version);
@@ -20,8 +21,8 @@ int32_t RequestSerializer::serialize_auth(uint32_t version,
   return r;
 }
 
-int32_t RequestSerializer::serialize_subscribe(const char* name,
-    void* data, uint32_t size, uint32_t flags) {
+int32_t RequestSerializer::serialize_subscribe(const char *name, void *data,
+                                               uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_SUBSCRIBE_REQ);
   caps->write(name);
@@ -33,8 +34,9 @@ int32_t RequestSerializer::serialize_subscribe(const char* name,
   return r;
 }
 
-int32_t RequestSerializer::serialize_unsubscribe(const char* name,
-    void* data, uint32_t size, uint32_t flags) {
+int32_t RequestSerializer::serialize_unsubscribe(const char *name, void *data,
+                                                 uint32_t size,
+                                                 uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_UNSUBSCRIBE_REQ);
   caps->write(name);
@@ -46,9 +48,10 @@ int32_t RequestSerializer::serialize_unsubscribe(const char* name,
   return r;
 }
 
-int32_t RequestSerializer::serialize_post(const char* name,
-    uint32_t msgtype, shared_ptr<Caps>& args, int32_t id,
-    uint32_t timeout, void* data, uint32_t size, uint32_t flags) {
+int32_t RequestSerializer::serialize_post(const char *name, uint32_t msgtype,
+                                          shared_ptr<Caps> &args, int32_t id,
+                                          uint32_t timeout, void *data,
+                                          uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_POST_REQ);
   caps->write((int32_t)msgtype);
@@ -64,9 +67,10 @@ int32_t RequestSerializer::serialize_post(const char* name,
   return r;
 }
 
-int32_t RequestSerializer::serialize_reply(const char* name,
-    shared_ptr<Caps>& args, int32_t id, int32_t retcode, void* data,
-    uint32_t size, uint32_t flags) {
+int32_t RequestSerializer::serialize_reply(const char *name,
+                                           shared_ptr<Caps> &args, int32_t id,
+                                           int32_t retcode, void *data,
+                                           uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_REQ);
   caps->write(id);
@@ -81,8 +85,8 @@ int32_t RequestSerializer::serialize_reply(const char* name,
   return r;
 }
 
-int32_t ResponseSerializer::serialize_auth(int32_t result, void* data,
-    uint32_t size, uint32_t flags) {
+int32_t ResponseSerializer::serialize_auth(int32_t result, void *data,
+                                           uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_RESP);
   caps->write(result);
@@ -94,9 +98,10 @@ int32_t ResponseSerializer::serialize_auth(int32_t result, void* data,
   return r;
 }
 
-int32_t ResponseSerializer::serialize_post(const char* name,
-    uint32_t msgtype, shared_ptr<Caps>& args, int32_t id, void* data,
-    uint32_t size, uint32_t flags) {
+int32_t ResponseSerializer::serialize_post(const char *name, uint32_t msgtype,
+                                           shared_ptr<Caps> &args, int32_t id,
+                                           void *data, uint32_t size,
+                                           uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_POST_RESP);
   caps->write((int32_t)msgtype);
@@ -111,9 +116,9 @@ int32_t ResponseSerializer::serialize_post(const char* name,
   return r;
 }
 
-int32_t ResponseSerializer::serialize_reply(const char* name,
-    int32_t id, ResponseArray& datas, void* data,
-    uint32_t size, uint32_t flags) {
+int32_t ResponseSerializer::serialize_reply(const char *name, int32_t id,
+                                            ResponseArray &datas, void *data,
+                                            uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_RESP);
   caps->write(id);
@@ -133,8 +138,8 @@ int32_t ResponseSerializer::serialize_reply(const char* name,
   return r;
 }
 
-int32_t RequestParser::parse_auth(shared_ptr<Caps>& caps,
-    uint32_t& version, string& extra) {
+int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,
+                                  string &extra) {
   int32_t v;
   if (caps->read(v) != CAPS_SUCCESS)
     return -1;
@@ -144,24 +149,22 @@ int32_t RequestParser::parse_auth(shared_ptr<Caps>& caps,
   return 0;
 }
 
-int32_t RequestParser::parse_subscribe(shared_ptr<Caps>& caps,
-    string& name) {
+int32_t RequestParser::parse_subscribe(shared_ptr<Caps> &caps, string &name) {
   int32_t v;
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
-int32_t RequestParser::parse_unsubscribe(shared_ptr<Caps>& caps,
-    string& name) {
+int32_t RequestParser::parse_unsubscribe(shared_ptr<Caps> &caps, string &name) {
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
-int32_t RequestParser::parse_post(shared_ptr<Caps>& caps, string& name,
-    uint32_t& msgtype, shared_ptr<Caps>& args, int32_t& id,
-    uint32_t& timeout) {
+int32_t RequestParser::parse_post(shared_ptr<Caps> &caps, string &name,
+                                  uint32_t &msgtype, shared_ptr<Caps> &args,
+                                  int32_t &id, uint32_t &timeout) {
   int32_t v;
   if (caps->read(v) != CAPS_SUCCESS)
     return -1;
@@ -178,8 +181,9 @@ int32_t RequestParser::parse_post(shared_ptr<Caps>& caps, string& name,
   return 0;
 }
 
-int32_t RequestParser::parse_reply(shared_ptr<Caps>& caps, string& name,
-    shared_ptr<Caps>& args, int32_t& id, int32_t& retcode) {
+int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, string &name,
+                                   shared_ptr<Caps> &args, int32_t &id,
+                                   int32_t &retcode) {
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
   if (caps->read(retcode) != CAPS_SUCCESS)
@@ -191,8 +195,8 @@ int32_t RequestParser::parse_reply(shared_ptr<Caps>& caps, string& name,
   return 0;
 }
 
-int32_t ResponseParser::parse_auth(const void* data, uint32_t size,
-    int32_t& result) {
+int32_t ResponseParser::parse_auth(const void *data, uint32_t size,
+                                   int32_t &result) {
   shared_ptr<Caps> caps;
   int32_t cmd;
 
@@ -207,8 +211,9 @@ int32_t ResponseParser::parse_auth(const void* data, uint32_t size,
   return 0;
 }
 
-int32_t ResponseParser::parse_post(shared_ptr<Caps>& caps, string& name,
-    uint32_t& msgtype, shared_ptr<Caps>& args, int32_t& id) {
+int32_t ResponseParser::parse_post(shared_ptr<Caps> &caps, string &name,
+                                   uint32_t &msgtype, shared_ptr<Caps> &args,
+                                   int32_t &id) {
   int32_t v;
   if (caps->read(v) != CAPS_SUCCESS)
     return -1;
@@ -222,10 +227,10 @@ int32_t ResponseParser::parse_post(shared_ptr<Caps>& caps, string& name,
   return 0;
 }
 
-int32_t ResponseParser::parse_reply(shared_ptr<Caps>& caps, string& name,
-    ResponseArray& replys) {
+int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, string &name,
+                                    ResponseArray &replys) {
   int32_t count;
-  const char* s;
+  const char *s;
 
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
