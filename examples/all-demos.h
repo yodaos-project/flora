@@ -21,6 +21,8 @@ private:
 
   void run_recv_msg();
 
+  void test_errors();
+
 private:
   std::shared_ptr<flora::Poll> poll;
   std::shared_ptr<flora::Dispatcher> dispatcher;

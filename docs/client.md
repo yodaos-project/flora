@@ -1,82 +1,89 @@
-# Agent
+# Client
 
-flora client代理类，自动保持与flora service连接及订阅状态。
+flora客户端低级接口，与Agent功能相同，建议使用Agent.
 
 ```
-Agent agent;
-// #exam-agent为可选项，标识此agent身份
-agent.config(FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#exam-agent");
-agent.config(FLORA_AGENT_CONFIG_BUFSIZE, 80 * 1024);
-agent.config(FLORA_AGENT_CONFIG_RECONN_INTERVAL, 5000);
-// 订阅消息
-agent.subscribe("foo", [](const char* name, shared_ptr<Caps>& msg, uint32_t type) {
-	int32_t iv;
-	string str;
-	msg->read(iv);  // read integer 1
-	msg->read_string(str);  // read string "hello"
-});
-// 声明远程方法
-agent.declare_method("foo", [](const char* name, shared_ptr<Caps>& msg, Reply& reply) {
-	// fill 'reply' content here
-	// message sender will received the reply content
-	reply->ret_code = 0;
-	reply->data = Caps::new_instance();
-	reply->data->write("world");
-});
+class FloraCallback : public ClientCallback {
+public:
+	void recv_post(const char *name, uint32_t msgtype, shared_ptr<Caps> &msg) {
+		// name == "foo"
+		// msgtype == FLORA_MSGTYPE_INSTANT
+		int32_t iv;
+		string str;
+		msg->read(iv);  // read integer 1
+		msg->read_string(str);  // read string "hello"
+	}
+	
+	void recv_call(const char *name, shared_ptr<Caps> &msg, Reply &reply) {
+		// name == "foo"
+		// fill 'reply' content here
+		// caller will receive the reply content
+		reply.ret_code = 0;
+		reply.data = Caps::new_instance();
+		reply.data->write("world");	
+	}
+	
+	void disconnected() {
+	}
+};
 
-agent.start();
+shared_ptr<flora::Client> floraClient;
+FloraCallback floraCallback;
+flora::Client::connect("unix:/var/run/flora.sock#exam-client", floraCallback, 80 * 1024, floraClient);
+
+floraClient->subscribe("foo");
+floraClient->declare_method("foo");
+
 
 // 发送广播消息
 shared_ptr<Caps> msg = Caps::new_instance();
 msg.write(1);
 msg.write("hello");
-agent.post("foo", msg, FLORA_MSGTYPE_INSTANT);
-
-// 远程方法调用
+floraClient->post("foo", msg, FLORA_MSGTYPE_INSTANT);
+// 调用远程方法并等待结果返回
 Response resp;
-// blocking call(msgname, msg, target, response, timeout)
-// NOTE: timeout set to 0 will use default timeout
-int32_t r = agent.call("foo", msg, "exam-agent", resp, 0);
+int32_t r = floraClient->call("foo", msg, "exam-client", resp, 0);
 if (r == FLORA_CLI_SUCCESS) {
 	string str;
-	resp.data->read(str);
-	printf("recv call foo reply: %d, %s\n", res.ret_code, str.c_str());
+	// resp.ret_code == 0
+	resp.data->read(str);  // str == "world"
 }
-// non-blocking call(msgname, msg, target, callback, timeout)
-agent.call("foo", msg, "exam-agent", [](int32_t rescode, Response& resp) {
+// 异步调用远程方法，在callback函数中得到返回结果
+floraClient->call("foo", msg, "exam-client", [](int32_t rescode, Response &resp) {
 	if (rescode == FLORA_CLI_SUCCESS) {
-		// resp.ret_code;  // ret_code will be 0
-		// resp.sender;  // sender will be "exam-agent"
+		// resp.ret_code == 0
 		string str;
-		resp.data->read_string(str);  // str will be "world"
+		resp.data->read(str); // str == "world"
 	}
 }, 0);
 ```
 
 ## Methods
 
-### config(key, ...)
+### <font color=#bdbdbd>(static)</font> connect(uri, cb, bufsize, result)
 
-为Agent对象配置参数
+连接flora服务，创建flora::Client对象
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
-key | uint32_t | | FLORA_AGENT_CONFIG_URI<br>FLORA_AGENT_CONFIG_BUFSIZE<br>FLORA_AGENT_CONFIG_RECONN_INTERVAL
+uri | string | | flora服务uri
+cb | [flora::ClientCallback](#ClientCallback) | |
+bufsize | uint32_t | | 消息缓冲大小
+result | shared_ptr\<flora::Client\> & | | 创建的flora::Client对象
 
 ---
 
-### subscribe(name, cb)
+### subscribe(name)
 
-订阅消息并指定收到消息的回调函数
+订阅消息
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
 name | const char* | | 消息名称
-cb | [SubscribeCallback](#SubscribeCallback) | | 回调函数
 
 ---
 
@@ -92,16 +99,15 @@ name | const char* | | 消息名称
 
 ---
 
-### declare_method(name, cb)
+### declare_method(name)
 
-声明远程调用方法，可接受远程方法调用并返回数据
+声明远程调用方法
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
 name | const char* | | 方法名称
-cb | [DeclareMethodCallback](#DeclareMethodCallback) | | 回调函数
 
 ---
 
@@ -114,24 +120,6 @@ cb | [DeclareMethodCallback](#DeclareMethodCallback) | | 回调函数
 name | type | default | description
 --- | --- | --- | ---
 name | const char* | | 方法名称
-
----
-
-### start(block)
-
-启动Agent。需要在config指定uri后调用。可以在subscribe之后或之前调用。
-
-#### Parameters
-
-name | type | default | description
---- | --- | --- | ---
-block | bool | false | 阻塞模式开关。如果开启阻塞模式，start不会返回，直至调用close方法。
-
----
-
-### close()
-
-关闭Agent。
 
 ---
 
@@ -212,32 +200,7 @@ FLORA_CLI_EINVAL | 参数非法
 FLORA_CLI_ECONN | flora service连接错误
 
 ---
-
-## Definition
-
-### <a id="SubscribeCallback"></a>SubscribeCallback(name, msg, type)
-
-回调函数：收到订阅的消息
-
-#### Parameters
-
-name | type | description
---- | --- | ---
-name | string | 消息名称
-msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST
-
-### <a id="DeclareMethodCallback"></a>DeclareMethodCallback(name, msg, reply)
-
-回调函数：收到远程方法调用
-
-#### Parameters
-
-name | type | description
---- | --- | ---
-name | string | 消息名称
-msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-reply | [Reply](#Reply)& | 填充reply结构体，给远程方法调用者返回数据
+## Definitions
 
 ### <a id="CallCallback"></a>CallCallback(int32_t, response)
 
@@ -268,3 +231,37 @@ name | type | description
 ret_code | int32_t | 返回码，远程方法返回，0为成功。
 data | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
 sender | string | 远程方法声明方的身份标识
+
+---
+
+# <a id="ClientCallback"></a>ClientCallback
+
+## Methods
+
+### recv_post(name, type, msg)
+
+回调函数：收到订阅的消息
+
+#### Parameters
+
+name | type | description
+--- | --- | ---
+name | string | 消息名称
+type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST
+msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
+
+### recv_call(name, msg, reply)
+
+回调函数：收到远程方法调用
+
+#### Parameters
+
+name | type | description
+--- | --- | ---
+name | string | 消息名称
+msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
+reply | [Reply](#Reply)& | 填充reply结构体，给远程方法调用者返回数据
+
+### disconnected
+
+回调函数：连接断开
