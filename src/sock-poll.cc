@@ -152,6 +152,8 @@ void SocketPoll::run() {
       if (FD_ISSET(adap_it->first, &rfds)) {
         KLOGD(TAG, "read from fd %d", adap_it->first);
         if (!read_from_client(adap_it->second)) {
+          dispatcher->erase_adapter(
+              static_pointer_cast<Adapter>(adap_it->second));
           pending_delete_adapters.push_back(adap_it->first);
           FD_CLR(adap_it->first, &all_fds);
         }
@@ -243,7 +245,7 @@ bool SocketPoll::read_from_client(shared_ptr<SocketAdapter> &adap) {
     r = adap->next_frame(frame);
     if (r == SOCK_ADAPTER_SUCCESS) {
       shared_ptr<Adapter> a = static_pointer_cast<Adapter>(adap);
-      if (!dispatcher->put(frame, a)) {
+      if (!dispatcher->put(frame.data, frame.size, a)) {
         KLOGE(TAG, "dispatcher put failed");
         return false;
       }

@@ -17,9 +17,9 @@ namespace internal {
 
 typedef struct {
   int32_t id;
-  ResponseArray *results;
-  std::function<void(ResponseArray &)> callback;
-  std::chrono::steady_clock::time_point timeout;
+  int32_t rcode;
+  Response *result;
+  std::function<void(int32_t, Response &)> callback;
 } PendingRequest;
 typedef std::list<PendingRequest> PendingRequestList;
 
@@ -38,25 +38,29 @@ public:
 
   int32_t unsubscribe(const char *name);
 
+  int32_t declare_method(const char *name);
+
+  int32_t remove_method(const char *name);
+
   int32_t post(const char *name, std::shared_ptr<Caps> &msg, uint32_t msgtype);
 
-  int32_t get(const char *name, std::shared_ptr<Caps> &msg,
-              ResponseArray &replys, uint32_t timeout);
+  int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
+               Response &reply, uint32_t timeout);
 
-  int32_t get(const char *name, std::shared_ptr<Caps> &msg,
-              std::function<void(ResponseArray &)> &&cb);
+  int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
+               std::function<void(int32_t, Response &)> &&cb, uint32_t timeout);
 
-  int32_t get(const char *name, std::shared_ptr<Caps> &msg,
-              std::function<void(ResponseArray &)> &cb);
+  int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
+               std::function<void(int32_t, Response &)> &cb, uint32_t timeout);
 
 private:
-  bool auth(const std::string &extra);
+  int32_t auth(const std::string &extra);
 
   void recv_loop();
 
   bool handle_received(int32_t size);
 
-  void iclose(bool passive);
+  void iclose(bool passive, int32_t err);
 
 private:
   uint32_t buf_size;
@@ -71,6 +75,7 @@ private:
   PendingRequestList pending_requests;
   int32_t reqseq = 0;
   uint32_t serialize_flags = 0;
+  int32_t close_reason = 0;
 
 public:
   std::string auth_extra;

@@ -17,6 +17,10 @@ class Dispatcher {
 public:
   virtual ~Dispatcher() = default;
 
+  virtual void run(bool blocking = false) = 0;
+
+  virtual void close() = 0;
+
   static std::shared_ptr<Dispatcher> new_instance(uint32_t msg_buf_size = 0);
 };
 
@@ -48,13 +52,19 @@ flora_dispatcher_t flora_dispatcher_new(uint32_t msg_buf_size);
 
 void flora_dispatcher_delete(flora_dispatcher_t handle);
 
-void flora_dispatcher_forward_msg(flora_dispatcher_t handle, const char *name,
-                                  caps_t msg);
+void flora_dispatcher_run(flora_dispatcher_t handle, int32_t block);
 
-void flora_dispatcher_subscribe(flora_dispatcher_t handle, const char *name,
-                                flora_received_func_t callback, void *arg);
+void flora_dispatcher_close(flora_dispatcher_t handle);
 
-void flora_dispatcher_unsubscribe(flora_dispatcher_t handle, const char *name);
+// void flora_dispatcher_forward_msg(flora_dispatcher_t handle, const char
+// *name,
+//                                   caps_t msg);
+
+// void flora_dispatcher_subscribe(flora_dispatcher_t handle, const char *name,
+//                                flora_received_func_t callback, void *arg);
+
+// void flora_dispatcher_unsubscribe(flora_dispatcher_t handle, const char
+// *name);
 
 // --flora poll functions--
 // 侦听连接

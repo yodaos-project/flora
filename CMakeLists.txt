@@ -70,8 +70,6 @@ set(flora_svc_SOURCES
   src/sock-poll.cc
   src/disp.h
   src/disp.cc
-  src/reply-mgr.h
-  src/reply-mgr.cc
   src/ser-helper.h
   src/ser-helper.cc
 )
