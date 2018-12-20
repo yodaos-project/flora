@@ -25,7 +25,7 @@ typedef std::list<PendingRequest> PendingRequestList;
 
 class Client : public flora::Client {
 public:
-  Client(uint32_t bufsize);
+  explicit Client(uint32_t bufsize);
 
   ~Client() noexcept;
 

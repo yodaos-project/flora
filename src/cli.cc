@@ -114,7 +114,6 @@ bool Client::auth(const string &extra) {
 
 void Client::recv_loop() {
   shared_ptr<Connection> conn;
-  int32_t c;
 
   cli_mutex.lock();
   conn = connection;
@@ -129,7 +128,7 @@ void Client::recv_loop() {
       KLOGW(TAG, "recv buffer not enough, %u bytes", buf_size);
       break;
     }
-    c = conn->recv(rbuffer + rbuf_off, buf_size - rbuf_off);
+    int32_t c = conn->recv(rbuffer + rbuf_off, buf_size - rbuf_off);
     if (c <= 0)
       break;
     if (!handle_received(rbuf_off + c))
@@ -527,12 +526,10 @@ int32_t flora_cli_post(flora_cli_t handle, const char *name, caps_t msg,
 
 void cxxreplys_to_creplys(ResponseArray &replys, flora_get_result *results) {
   size_t i;
-  string *extra;
-
   for (i = 0; i < replys.size(); ++i) {
     results[i].ret_code = replys[i].ret_code;
     results[i].data = Caps::convert(replys[i].data);
-    extra = &replys[i].extra;
+    string *extra = &replys[i].extra;
     if (extra->length()) {
       results[i].extra = new char[extra->length() + 1];
       strcpy(results[i].extra, extra->c_str());

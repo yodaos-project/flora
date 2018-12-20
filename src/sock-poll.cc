@@ -23,6 +23,7 @@ namespace internal {
 SocketPoll::SocketPoll(const std::string &name) {
   this->name = name;
   type = POLL_TYPE_UNIX;
+  this->port = 0;
 }
 
 SocketPoll::SocketPoll(const std::string &host, int32_t port) {
@@ -105,11 +106,9 @@ void SocketPoll::run() {
   fd_set rfds;
   int new_fd;
   int max_fd;
-  int lfd;
   AdapterMap::iterator adap_it;
   vector<int> pending_delete_adapters;
   size_t i;
-  int32_t r;
 
   start_mutex.lock();
   FD_ZERO(&all_fds);
@@ -119,12 +118,12 @@ void SocketPoll::run() {
   start_mutex.unlock();
   while (true) {
     rfds = all_fds;
-    r = do_poll(&rfds, max_fd);
+    int32_t r = do_poll(&rfds, max_fd);
     // system call error
     if (r < 0)
       break;
     // closed
-    lfd = get_listen_fd();
+    int lfd = get_listen_fd();
     if (lfd < 0) {
       KLOGI(TAG, "unix poll closed, quit");
       break;

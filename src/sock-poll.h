@@ -20,7 +20,7 @@ namespace internal {
 
 class SocketPoll : public flora::Poll {
 public:
-  SocketPoll(const std::string &name);
+  explicit SocketPoll(const std::string &name);
 
   SocketPoll(const std::string &host, int32_t port);
 

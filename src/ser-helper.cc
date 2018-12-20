@@ -150,7 +150,6 @@ int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,
 }
 
 int32_t RequestParser::parse_subscribe(shared_ptr<Caps> &caps, string &name) {
-  int32_t v;
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
@@ -230,7 +229,6 @@ int32_t ResponseParser::parse_post(shared_ptr<Caps> &caps, string &name,
 int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, string &name,
                                     ResponseArray &replys) {
   int32_t count;
-  const char *s;
 
   if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;

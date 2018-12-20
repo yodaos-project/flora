@@ -50,9 +50,8 @@ static void delete_cagent(flora_agent_t agent) {
 static void print_responses(const char *prefix, ResponseArray &resps) {
   KLOGI(TAG, "%s: response num %d", prefix, resps.size());
   size_t i;
-  int32_t iv;
   for (i = 0; i < resps.size(); ++i) {
-    iv = -1;
+    int32_t iv = -1;
     resps[i].data->read(iv);
     KLOGI(TAG, "%d: ret %d, value %d, from %s", i, resps[i].ret_code, iv,
           resps[i].extra.c_str());
@@ -63,9 +62,8 @@ static void print_c_responses(const char *prefix, flora_get_result *results,
                               uint32_t size) {
   KLOGI(TAG, "%s: response num %d", prefix, size);
   uint32_t i;
-  int32_t iv;
   for (i = 0; i < size; ++i) {
-    iv = -1;
+    int32_t iv = -1;
     caps_read_integer(results[i].data, &iv);
     KLOGI(TAG, "%d: ret %d, value %d, from %s", i, results[i].ret_code, iv,
           results[i].extra);

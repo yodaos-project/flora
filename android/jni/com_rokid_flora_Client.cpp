@@ -139,7 +139,7 @@ static jint com_rokid_flora_Client_native_connect(JNIEnv *env, jobject thiz,
   uristr[slen] = '\0';
   int32_t r =
       flora::Client::connect(uristr, &handle->callback, bufsize, handle->cli);
-  delete uristr;
+  delete[] uristr;
   if (r == FLORA_CLI_SUCCESS) {
     env->SetLongField(thiz, g_constants.java_fields[JAVA_FIELD_NATIVE_HANDLE],
                       (jlong)handle);
@@ -170,7 +170,7 @@ static jint com_rokid_flora_Client_native_subscribe(JNIEnv *env, jobject thiz,
   env->GetStringUTFRegion(name, 0, slen, namestr);
   namestr[slen] = '\0';
   int32_t r = nh->cli->subscribe(namestr, type);
-  delete namestr;
+  delete[] namestr;
   return r;
 }
 
@@ -185,7 +185,7 @@ static jint com_rokid_flora_Client_native_unsubscribe(JNIEnv *env, jobject thiz,
   env->GetStringUTFRegion(name, 0, slen, namestr);
   namestr[slen] = '\0';
   int32_t r = nh->cli->unsubscribe(namestr, type);
-  delete namestr;
+  delete[] namestr;
   return r;
 }
 
@@ -202,7 +202,7 @@ static jint com_rokid_flora_Client_native_post(JNIEnv *env, jobject thiz,
   CapsNativeHandle *cmsg = (CapsNativeHandle *)msg;
   shared_ptr<Caps> t;
   int32_t r = nh->cli->post(namestr, cmsg ? cmsg->caps : t, type);
-  delete namestr;
+  delete[] namestr;
   return r;
 }
 
@@ -212,13 +212,12 @@ static void gen_java_reply_list(JNIEnv *env, jobject replys,
   jobject jm;
   jobject je;
   vector<flora::Reply>::iterator it;
-  CapsNativeHandle *cnh;
 
   for (it = nreps.begin(); it != nreps.end(); ++it) {
     jr = env->AllocObject(g_constants.java_reply_cls);
     env->SetIntField(jr, g_constants.java_fields[JAVA_FIELD_REPLY_RETCODE],
                      (*it).ret_code);
-    cnh = new CapsNativeHandle();
+    CapsNativeHandle *cnh = new CapsNativeHandle();
     cnh->caps = (*it).data;
     jm = env->NewObject(g_constants.java_caps_cls,
                         g_constants.java_methods[JAVA_METHOD_CAPS_CONSTRUCTOR],
@@ -247,7 +246,7 @@ static jint com_rokid_flora_Client_native_get(JNIEnv *env, jobject thiz,
   vector<flora::Reply> nreps;
   shared_ptr<Caps> t;
   int32_t r = nh->cli->get(namestr, cmsg ? cmsg->caps : t, nreps, timeout);
-  delete namestr;
+  delete[] namestr;
   if (r == FLORA_CLI_SUCCESS) {
     gen_java_reply_list(env, replys, nreps);
   }

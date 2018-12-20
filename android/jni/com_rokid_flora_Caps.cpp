@@ -99,7 +99,7 @@ static jint com_rokid_flora_Caps_native_write_string(JNIEnv *env, jobject thiz,
   }
   int32_t r = handle->caps->write(str);
   if (str)
-    delete str;
+    delete[] str;
   return r;
 }
 
@@ -117,7 +117,7 @@ static jint com_rokid_flora_Caps_native_write_binary(JNIEnv *env, jobject thiz,
   }
   int32_t r = handle->caps->write(data, length);
   if (data)
-    delete data;
+    delete[] data;
   return r;
 }
 

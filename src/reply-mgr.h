@@ -28,7 +28,7 @@ typedef std::list<PendingGet> PendingGetList;
 
 class ReplyManager {
 public:
-  ReplyManager(uint32_t bufsize);
+  explicit ReplyManager(uint32_t bufsize);
 
   ~ReplyManager();
 

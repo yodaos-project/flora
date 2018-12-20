@@ -78,10 +78,9 @@ void Agent::start(bool block) {
 void Agent::run() {
   unique_lock<mutex> locker(conn_mutex);
   shared_ptr<Client> cli;
-  int32_t r;
 
   while (working) {
-    r = Client::connect(uri.c_str(), this, bufsize, cli);
+    int32_t r = Client::connect(uri.c_str(), this, bufsize, cli);
     if (r != FLORA_CLI_SUCCESS) {
       KLOGI(TAG,
             "connect to flora service %s failed, retry after %u milliseconds",
@@ -288,11 +287,10 @@ int32_t flora_agent_get_nb(flora_agent_t agent, const char *name, caps_t msg,
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
   shared_ptr<Caps> cxxmsg = Caps::convert(msg);
   return cxxagent->get(name, cxxmsg, [cb, arg](ResponseArray &resps) {
-    flora_get_result *results;
     if (resps.empty()) {
       cb(nullptr, 0, arg);
     } else {
-      results = new flora_get_result[resps.size()];
+      flora_get_result *results = new flora_get_result[resps.size()];
       cxxreplys_to_creplys(resps, results);
       cb(results, resps.size(), arg);
     }

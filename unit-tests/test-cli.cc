@@ -59,7 +59,6 @@ bool TestClient::init(const char *uri, bool capi) {
 void TestClient::do_subscribe() {
   int32_t c = rand() % FLORA_MSG_COUNT;
   int32_t i;
-  int32_t idx;
   int32_t r;
 
   memset(recv_instant_counter, 0, sizeof(recv_instant_counter));
@@ -67,7 +66,7 @@ void TestClient::do_subscribe() {
   memset(recv_request_counter, 0, sizeof(recv_request_counter));
   memset(subscribe_flags, 0, sizeof(subscribe_flags));
   for (i = 0; i < c; ++i) {
-    idx = rand() % FLORA_MSG_COUNT;
+    int32_t idx = rand() % FLORA_MSG_COUNT;
     if (subscribe_flags[idx] == 0) {
       if (use_c_api) {
         r = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name);
@@ -86,7 +85,6 @@ void TestClient::do_subscribe() {
 void TestClient::do_post() {
   int32_t c = rand() % MAX_POST_COUNT;
   int32_t i;
-  int32_t idx;
   vector<Response> results;
   flora_get_result *c_results;
   uint32_t res_count;
@@ -94,7 +92,7 @@ void TestClient::do_post() {
 
   memset(post_counter, 0, sizeof(post_counter));
   for (i = 0; i < c; ++i) {
-    idx = rand() % FLORA_MSG_COUNT;
+    int32_t idx = rand() % FLORA_MSG_COUNT;
     if (use_c_api) {
       r[0] = flora_cli_post(c_flora_cli, flora_msgs[idx].name,
                             flora_msgs[idx].c_args, FLORA_MSGTYPE_INSTANT);

@@ -20,7 +20,7 @@ typedef std::map<std::string, PersistMsg> PersistMsgMap;
 
 class Dispatcher : public flora::Dispatcher {
 public:
-  Dispatcher(uint32_t bufsize);
+  explicit Dispatcher(uint32_t bufsize);
 
   ~Dispatcher() noexcept;
 
