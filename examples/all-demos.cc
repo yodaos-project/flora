@@ -120,7 +120,7 @@ void DemoAllInOne::run_post_msg() {
   stop_service();
 }
 
-static void exam_subscribe_callback(const char* name, caps_t msg, uint32_t type,
+static void exam_subscribe_callback(const char *name, caps_t msg, uint32_t type,
                                     flora_reply_t *reply, void *arg) {
   int32_t iv = -1;
 
@@ -150,15 +150,18 @@ static void exam_subscribe_callback(const char* name, caps_t msg, uint32_t type,
 }
 
 static void agent_subscribe(Agent &agent, flora_agent_t cagent) {
-  agent.subscribe("0", [](const char* name, shared_ptr<Caps> &msg, uint32_t type, Reply *) {
-    KLOGI(TAG, "recv msg %s, type %u, content %p", name, type, msg.get());
-  });
-  agent.subscribe("1", [](const char* name, shared_ptr<Caps> &msg, uint32_t type, Reply *) {
-    int32_t iv = -1;
-    msg->read(iv);
-    KLOGI(TAG, "recv msg %s, type %u, content %d", name, type, iv);
-  });
-  agent.subscribe("2", [](const char* name, shared_ptr<Caps> &msg, uint32_t type, Reply *reply) {
+  agent.subscribe(
+      "0", [](const char *name, shared_ptr<Caps> &msg, uint32_t type, Reply *) {
+        KLOGI(TAG, "recv msg %s, type %u, content %p", name, type, msg.get());
+      });
+  agent.subscribe(
+      "1", [](const char *name, shared_ptr<Caps> &msg, uint32_t type, Reply *) {
+        int32_t iv = -1;
+        msg->read(iv);
+        KLOGI(TAG, "recv msg %s, type %u, content %d", name, type, iv);
+      });
+  agent.subscribe("2", [](const char *name, shared_ptr<Caps> &msg,
+                          uint32_t type, Reply *reply) {
     int32_t iv = -1;
     msg->read(iv);
     KLOGI(TAG, "recv msg %s, type %u, content %d", name, type, iv);
@@ -166,7 +169,8 @@ static void agent_subscribe(Agent &agent, flora_agent_t cagent) {
     reply->data = Caps::new_instance();
     reply->data->write(2);
   });
-  agent.subscribe("3", [](const char* name, shared_ptr<Caps> &msg, uint32_t type, Reply *reply) {
+  agent.subscribe("3", [](const char *name, shared_ptr<Caps> &msg,
+                          uint32_t type, Reply *reply) {
     int32_t iv = -1;
     msg->read(iv);
     KLOGI(TAG, "recv msg %s, type %u, content %d", name, type, iv);
