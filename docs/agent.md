@@ -8,7 +8,7 @@ Agent agent;
 agent.config(FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#exam-agent");
 agent.config(FLORA_AGENT_CONFIG_BUFSIZE, 80 * 1024);
 agent.config(FLORA_AGENT_CONFIG_RECONN_INTERVAL, 5000);
-agent.subscribe("foo", [](shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
+agent.subscribe("foo", [](const char* name, shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
 	int32_t iv;
 	string str;
 	msg->read(iv);  // read integer 1
@@ -169,7 +169,7 @@ FLORA_CLI_ECONN | flora service连接错误
 
 ## Definition
 
-### <a id="SubscribeCallback"></a>SubscribeCallback(msg, type, reply)
+### <a id="SubscribeCallback"></a>SubscribeCallback(name, msg, type, reply)
 
 回调函数：收到订阅的消息
 
@@ -177,6 +177,7 @@ FLORA_CLI_ECONN | flora service连接错误
 
 name | type | description
 --- | --- | ---
+name | string | 消息名称
 msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
 type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST<br>FLORA_MSGTYPE_REQUEST
 reply | [Reply](#Reply)\* | 当type == FLORA_MSGTYPE_REQUEST时，填充reply指向的结构体，给消息发送者回复数据
