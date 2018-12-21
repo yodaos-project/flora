@@ -1,7 +1,7 @@
 #pragma once
 
-#include "flora-svc.h"
 #include "flora-agent.h"
+#include "flora-svc.h"
 
 #define TAG "flora.demo"
 #define AGENT_NUMBER 4

@@ -1,15 +1,15 @@
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/socket.h>
+#include "sock-poll.h"
+#include "flora-svc.h"
+#include "rlog.h"
+#include <chrono>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <sys/un.h>
 #include <string.h>
-#include <chrono>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include <vector>
-#include "flora-svc.h"
-#include "sock-poll.h"
-#include "rlog.h"
 
 using namespace std;
 
@@ -20,18 +20,19 @@ using namespace std;
 namespace flora {
 namespace internal {
 
-SocketPoll::SocketPoll(const std::string& name) {
+SocketPoll::SocketPoll(const std::string &name) {
   this->name = name;
   type = POLL_TYPE_UNIX;
+  this->port = 0;
 }
 
-SocketPoll::SocketPoll(const std::string& host, int32_t port) {
+SocketPoll::SocketPoll(const std::string &host, int32_t port) {
   this->host = host;
   this->port = port;
   type = POLL_TYPE_TCP;
 }
 
-int32_t SocketPoll::start(shared_ptr<flora::Dispatcher>& disp) {
+int32_t SocketPoll::start(shared_ptr<flora::Dispatcher> &disp) {
   unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get())
     return FLORA_POLL_ALREADY_START;
@@ -63,7 +64,7 @@ void SocketPoll::stop() {
   dispatcher.reset();
 }
 
-int32_t SocketPoll::do_poll(fd_set* rfds, int max_fd) {
+int32_t SocketPoll::do_poll(fd_set *rfds, int max_fd) {
   int r;
 #ifdef SELECT_BLOCK_IF_FD_CLOSED
   struct timeval tv;
@@ -91,13 +92,13 @@ int32_t SocketPoll::do_poll(fd_set* rfds, int max_fd) {
 static int unix_accept(int lfd) {
   sockaddr_un addr;
   socklen_t addr_len = sizeof(addr);
-  return accept(lfd, (sockaddr*)&addr, &addr_len);
+  return accept(lfd, (sockaddr *)&addr, &addr_len);
 }
 
 static int tcp_accept(int lfd) {
   sockaddr_in addr;
   socklen_t addr_len = sizeof(addr);
-  return accept(lfd, (sockaddr*)&addr, &addr_len);
+  return accept(lfd, (sockaddr *)&addr, &addr_len);
 }
 
 void SocketPoll::run() {
@@ -105,11 +106,9 @@ void SocketPoll::run() {
   fd_set rfds;
   int new_fd;
   int max_fd;
-  int lfd;
   AdapterMap::iterator adap_it;
   vector<int> pending_delete_adapters;
   size_t i;
-  int32_t r;
 
   start_mutex.lock();
   FD_ZERO(&all_fds);
@@ -119,12 +118,12 @@ void SocketPoll::run() {
   start_mutex.unlock();
   while (true) {
     rfds = all_fds;
-    r = do_poll(&rfds, max_fd);
+    int32_t r = do_poll(&rfds, max_fd);
     // system call error
     if (r < 0)
       break;
     // closed
-    lfd = get_listen_fd();
+    int lfd = get_listen_fd();
     if (lfd < 0) {
       KLOGI(TAG, "unix poll closed, quit");
       break;
@@ -180,7 +179,7 @@ bool SocketPoll::init_unix_socket() {
   addr.sun_family = AF_UNIX;
   strcpy(addr.sun_path, name.c_str());
   unlink(name.c_str());
-  if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (::bind(fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
     ::close(fd);
     KLOGE(TAG, "socket bind failed: %s", strerror(errno));
     return false;
@@ -197,10 +196,11 @@ bool SocketPoll::init_tcp_socket() {
   int v = 1;
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
   struct sockaddr_in addr;
-  struct hostent* hp;
+  struct hostent *hp;
   hp = gethostbyname(host.c_str());
   if (hp == nullptr) {
-    KLOGE(TAG, "gethostbyname failed for host %s: %s", host.c_str(), strerror(errno));
+    KLOGE(TAG, "gethostbyname failed for host %s: %s", host.c_str(),
+          strerror(errno));
     ::close(fd);
     return false;
   }
@@ -208,7 +208,7 @@ bool SocketPoll::init_tcp_socket() {
   addr.sin_family = AF_INET;
   memcpy(&addr.sin_addr, hp->h_addr_list[0], sizeof(addr.sin_addr));
   addr.sin_port = htons(port);
-  if (::bind(fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (::bind(fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
     ::close(fd);
     KLOGE(TAG, "socket bind failed: %s", strerror(errno));
     return false;
@@ -219,8 +219,8 @@ bool SocketPoll::init_tcp_socket() {
 }
 
 void SocketPoll::new_adapter(int fd) {
-  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(fd,
-      max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0);
+  shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(
+      fd, max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0);
   adapters.insert(make_pair(fd, adap));
 }
 
@@ -233,7 +233,7 @@ void SocketPoll::delete_adapter(int fd) {
   }
 }
 
-bool SocketPoll::read_from_client(shared_ptr<SocketAdapter>& adap) {
+bool SocketPoll::read_from_client(shared_ptr<SocketAdapter> &adap) {
   int32_t r = adap->read();
   if (r != SOCK_ADAPTER_SUCCESS)
     return false;

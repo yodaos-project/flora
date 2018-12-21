@@ -22,19 +22,19 @@ public:
 
   // return:  = 0   success
   //          < 0   error
-  int32_t read();
+  int32_t read() override;
 
-  int32_t next_frame(Frame& frame);
+  int32_t next_frame(Frame &frame) override;
 
-  void write(const void* data, uint32_t size);
+  void write(const void *data, uint32_t size) override;
 
-  void close();
+  void close() override;
 
-  bool closed() const;
+  bool closed() const override;
 
 private:
   int socket;
-  int8_t* buffer = nullptr;
+  int8_t *buffer = nullptr;
   uint32_t buf_size;
   uint32_t cur_size = 0;
   uint32_t frame_begin = 0;

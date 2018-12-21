@@ -16,7 +16,7 @@ typedef struct {
 
 class TestClient : public ClientCallback {
 public:
-  bool init(const char* uri, bool capi);
+  bool init(const char *uri, bool capi);
 
   void do_subscribe();
 
@@ -26,15 +26,15 @@ public:
 
   void close();
 
-  void recv_post(const char* name, uint32_t msgtype, shared_ptr<Caps>& msg);
+  void recv_post(const char *name, uint32_t msgtype, shared_ptr<Caps> &msg);
 
-  int32_t recv_get(const char* name, shared_ptr<Caps>& msg, shared_ptr<Caps>& reply);
+  int32_t recv_get(const char *name, shared_ptr<Caps> &msg,
+                   shared_ptr<Caps> &reply);
 
 private:
+  void c_recv_post(const char *name, uint32_t msgtype, caps_t args);
 
-  void c_recv_post(const char* name, uint32_t msgtype, caps_t args);
-
-  int32_t c_recv_get(const char* name, caps_t args, caps_t* reply);
+  int32_t c_recv_get(const char *name, caps_t args, caps_t *reply);
 
 public:
   static void static_init(bool capi);
@@ -44,9 +44,11 @@ public:
   static flora_cli_callback_t flora_callback;
 
 private:
-  static void recv_post_s(const char* name, uint32_t msgtype, caps_t msg, void* arg);
+  static void recv_post_s(const char *name, uint32_t msgtype, caps_t msg,
+                          void *arg);
 
-  static int32_t recv_get_s(const char* name, caps_t msg, void* arg, caps_t* reply);
+  static int32_t recv_get_s(const char *name, caps_t msg, void *arg,
+                            caps_t *reply);
 
 public:
   int8_t subscribe_flags[FLORA_MSG_COUNT];

@@ -1,12 +1,12 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include "clargs.h"
 #include "rlog.h"
 #include "test-cli.h"
 #include "test-svc.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #define TAG "unit-test.main"
 
@@ -17,14 +17,14 @@
 #define COMM_TYPE_UNIX 0
 #define COMM_TYPE_TCP 1
 
-static void print_prompt(const char* progname) {
-  static const char* format =
-    "USAGE: %s [options]\n"
-    "options:\n"
-    "--client-num=$TEST_CLIENT_NUM  (default value 2)\n"
-    "--repeat=$TEST_REPEAT_TIMES  (default value 1)\n"
-    "--comm-type=$TYPE  (unix|tcp)  (default value unix)\n"
-    "--use-c-api\n";
+static void print_prompt(const char *progname) {
+  static const char *format =
+      "USAGE: %s [options]\n"
+      "options:\n"
+      "--client-num=$TEST_CLIENT_NUM  (default value 2)\n"
+      "--repeat=$TEST_REPEAT_TIMES  (default value 1)\n"
+      "--comm-type=$TYPE  (unix|tcp)  (default value unix)\n"
+      "--use-c-api\n";
   KLOGE(TAG, format, progname);
 }
 
@@ -35,7 +35,7 @@ typedef struct {
   int32_t use_c_api;
 } CmdlineArgs;
 
-static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
+static bool parse_cmdline(int argc, char **argv, CmdlineArgs *args) {
   clargs_h h = clargs_parse(argc, argv);
   if (h == 0) {
     print_prompt(argv[0]);
@@ -46,8 +46,8 @@ static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
     clargs_destroy(h);
     return false;
   }
-  const char* v = clargs_opt_get(h, "client-num");
-  char* ep;
+  const char *v = clargs_opt_get(h, "client-num");
+  char *ep;
   if (v == nullptr) {
     args->client_num = 2;
   } else {
@@ -86,7 +86,7 @@ static bool parse_cmdline(int argc, char** argv, CmdlineArgs* args) {
   return true;
 }
 
-static bool check_results(TestClient* clients, int32_t num) {
+static bool check_results(TestClient *clients, int32_t num) {
   int32_t total_post_counter[FLORA_MSG_COUNT];
   int32_t i, j;
 
@@ -101,35 +101,41 @@ static bool check_results(TestClient* clients, int32_t num) {
     for (j = 0; j < FLORA_MSG_COUNT; ++j) {
       if (clients[i].subscribe_flags[j]) {
         if (clients[i].recv_instant_counter[j] != total_post_counter[j]) {
-          KLOGE(TAG, "client %d, msg(instant) %d recv/post not equal %d/%d",
-              i, j, clients[i].recv_instant_counter[j], total_post_counter[j]);
+          KLOGE(TAG, "client %d, msg(instant) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_instant_counter[j], total_post_counter[j]);
           return false;
         }
         if (clients[i].recv_persist_counter[j] != total_post_counter[j]) {
-          KLOGE(TAG, "client %d, msg(persist) %d recv/post not equal %d/%d",
-              i, j, clients[i].recv_persist_counter[j], total_post_counter[j]);
+          KLOGE(TAG, "client %d, msg(persist) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_persist_counter[j], total_post_counter[j]);
           return false;
         }
         if (clients[i].recv_request_counter[j] != total_post_counter[j]) {
-          KLOGE(TAG, "client %d, msg(request) %d recv/post not equal %d/%d",
-              i, j, clients[i].recv_request_counter[j], total_post_counter[j]);
+          KLOGE(TAG, "client %d, msg(request) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_request_counter[j], total_post_counter[j]);
           return false;
         }
       }
       if (clients[i].subscribe_flags[j] == 0) {
         if (clients[i].recv_instant_counter[j] != 0) {
-          KLOGE(TAG, "client %d, msg(instant) %d should not received, but recv %d times",
-              i, j, clients[i].recv_instant_counter[j]);
+          KLOGE(TAG,
+                "client %d, msg(instant) %d should not received, but recv %d "
+                "times",
+                i, j, clients[i].recv_instant_counter[j]);
           return false;
         }
         if (clients[i].recv_persist_counter[j] != 0) {
-          KLOGE(TAG, "client %d, msg(persist) %d should not received, but recv %d times",
-              i, j, clients[i].recv_persist_counter[j]);
+          KLOGE(TAG,
+                "client %d, msg(persist) %d should not received, but recv %d "
+                "times",
+                i, j, clients[i].recv_persist_counter[j]);
           return false;
         }
         if (clients[i].recv_request_counter[j] != 0) {
-          KLOGE(TAG, "client %d, msg(request) %d should not received, but recv %d times",
-              i, j, clients[i].recv_request_counter[j]);
+          KLOGE(TAG,
+                "client %d, msg(request) %d should not received, but recv %d "
+                "times",
+                i, j, clients[i].recv_request_counter[j]);
           return false;
         }
       }
@@ -139,7 +145,7 @@ static bool check_results(TestClient* clients, int32_t num) {
   return true;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   CmdlineArgs args;
   if (!parse_cmdline(argc, argv, &args))
     return 0;
@@ -148,7 +154,7 @@ int main(int argc, char** argv) {
   TestClient::static_init(args.use_c_api);
 
   TestService tsvc;
-  const char* uri;
+  const char *uri;
   if (args.comm_type == COMM_TYPE_TCP)
     uri = TCP_SERVICE_URI;
   else
@@ -158,7 +164,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  TestClient* clients = new TestClient[args.client_num];
+  TestClient *clients = new TestClient[args.client_num];
   int32_t i;
 
   char cli_uri[64];

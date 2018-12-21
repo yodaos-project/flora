@@ -1,8 +1,8 @@
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "test-cli.h"
 #include "rlog.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MAX_POST_COUNT 256
 #define TAG "unit-test.TestClient"
@@ -10,18 +10,19 @@
 FloraMsg TestClient::flora_msgs[FLORA_MSG_COUNT];
 flora_cli_callback_t TestClient::flora_callback;
 
-void TestClient::recv_post_s(const char* name, uint32_t msgtype, caps_t msg, void* arg) {
-  TestClient* tc = reinterpret_cast<TestClient*>(arg);
+void TestClient::recv_post_s(const char *name, uint32_t msgtype, caps_t msg,
+                             void *arg) {
+  TestClient *tc = reinterpret_cast<TestClient *>(arg);
   tc->c_recv_post(name, msgtype, msg);
 }
 
-int32_t TestClient::recv_get_s(const char* name, caps_t msg, void* arg, caps_t* reply) {
-  TestClient* tc = reinterpret_cast<TestClient*>(arg);
+int32_t TestClient::recv_get_s(const char *name, caps_t msg, void *arg,
+                               caps_t *reply) {
+  TestClient *tc = reinterpret_cast<TestClient *>(arg);
   return tc->c_recv_get(name, msg, reply);
 }
 
-static void conn_disconnected(void* arg) {
-}
+static void conn_disconnected(void *arg) {}
 
 void TestClient::static_init(bool capi) {
   int32_t i;
@@ -47,18 +48,17 @@ void TestClient::static_init(bool capi) {
   }
 }
 
-bool TestClient::init(const char* uri, bool capi) {
+bool TestClient::init(const char *uri, bool capi) {
   use_c_api = capi;
   if (capi)
-    return flora_cli_connect(uri, &flora_callback, this, 0,
-        &c_flora_cli) == FLORA_CLI_SUCCESS;
+    return flora_cli_connect(uri, &flora_callback, this, 0, &c_flora_cli) ==
+           FLORA_CLI_SUCCESS;
   return Client::connect(uri, this, 0, flora_cli) == FLORA_CLI_SUCCESS;
 }
 
 void TestClient::do_subscribe() {
   int32_t c = rand() % FLORA_MSG_COUNT;
   int32_t i;
-  int32_t idx;
   int32_t r;
 
   memset(recv_instant_counter, 0, sizeof(recv_instant_counter));
@@ -66,7 +66,7 @@ void TestClient::do_subscribe() {
   memset(recv_request_counter, 0, sizeof(recv_request_counter));
   memset(subscribe_flags, 0, sizeof(subscribe_flags));
   for (i = 0; i < c; ++i) {
-    idx = rand() % FLORA_MSG_COUNT;
+    int32_t idx = rand() % FLORA_MSG_COUNT;
     if (subscribe_flags[idx] == 0) {
       if (use_c_api) {
         r = flora_cli_subscribe(c_flora_cli, flora_msgs[idx].name);
@@ -85,29 +85,28 @@ void TestClient::do_subscribe() {
 void TestClient::do_post() {
   int32_t c = rand() % MAX_POST_COUNT;
   int32_t i;
-  int32_t idx;
   vector<Response> results;
-  flora_get_result* c_results;
+  flora_get_result *c_results;
   uint32_t res_count;
   int32_t r[3];
 
   memset(post_counter, 0, sizeof(post_counter));
   for (i = 0; i < c; ++i) {
-    idx = rand() % FLORA_MSG_COUNT;
+    int32_t idx = rand() % FLORA_MSG_COUNT;
     if (use_c_api) {
       r[0] = flora_cli_post(c_flora_cli, flora_msgs[idx].name,
-          flora_msgs[idx].c_args, FLORA_MSGTYPE_INSTANT);
+                            flora_msgs[idx].c_args, FLORA_MSGTYPE_INSTANT);
       r[1] = flora_cli_post(c_flora_cli, flora_msgs[idx].name,
-          flora_msgs[idx].c_args, FLORA_MSGTYPE_PERSIST);
+                            flora_msgs[idx].c_args, FLORA_MSGTYPE_PERSIST);
       r[2] = flora_cli_get(c_flora_cli, flora_msgs[idx].name,
-          flora_msgs[idx].c_args, &c_results, &res_count, 0);
+                           flora_msgs[idx].c_args, &c_results, &res_count, 0);
     } else {
       r[0] = flora_cli->post(flora_msgs[idx].name, flora_msgs[idx].args,
-          FLORA_MSGTYPE_INSTANT);
+                             FLORA_MSGTYPE_INSTANT);
       r[1] = flora_cli->post(flora_msgs[idx].name, flora_msgs[idx].args,
-          FLORA_MSGTYPE_PERSIST);
-      r[2] = flora_cli->get(flora_msgs[idx].name, flora_msgs[idx].args,
-          results, 0);
+                             FLORA_MSGTYPE_PERSIST);
+      r[2] = flora_cli->get(flora_msgs[idx].name, flora_msgs[idx].args, results,
+                            0);
     }
     if (r[0] != FLORA_CLI_SUCCESS)
       KLOGE(TAG, "client instant post failed");
@@ -152,8 +151,8 @@ void TestClient::close() {
     flora_cli.reset();
 }
 
-void TestClient::recv_post(const char* name, uint32_t msgtype,
-    shared_ptr<Caps>& args) {
+void TestClient::recv_post(const char *name, uint32_t msgtype,
+                           shared_ptr<Caps> &args) {
   int32_t i;
   int32_t v;
 
@@ -167,10 +166,9 @@ void TestClient::recv_post(const char* name, uint32_t msgtype,
         KLOGE(TAG, "client recv invalid msgtype %u", msgtype);
       if (flora_msgs[i].args.get() == nullptr && args.get() == nullptr)
         break;
-      if ((flora_msgs[i].args.get() == nullptr && args.get())
-          || (flora_msgs[i].args.get() && args.get() == nullptr)
-          || args->read(v) != CAPS_SUCCESS
-          || v != i) {
+      if ((flora_msgs[i].args.get() == nullptr && args.get()) ||
+          (flora_msgs[i].args.get() && args.get() == nullptr) ||
+          args->read(v) != CAPS_SUCCESS || v != i) {
         KLOGE(TAG, "received incorrect msg args, msgtype = %u", msgtype);
         break;
       }
@@ -179,8 +177,8 @@ void TestClient::recv_post(const char* name, uint32_t msgtype,
   }
 }
 
-int32_t TestClient::recv_get(const char* name, shared_ptr<Caps>& args,
-    shared_ptr<Caps>& reply) {
+int32_t TestClient::recv_get(const char *name, shared_ptr<Caps> &args,
+                             shared_ptr<Caps> &reply) {
   int32_t i;
   int32_t v;
 
@@ -189,10 +187,9 @@ int32_t TestClient::recv_get(const char* name, shared_ptr<Caps>& args,
       ++recv_request_counter[i];
       if (flora_msgs[i].args.get() == nullptr && args.get() == nullptr)
         break;
-      if ((flora_msgs[i].args.get() == nullptr && args.get())
-          || (flora_msgs[i].args.get() && args.get() == nullptr)
-          || args->read(v) != CAPS_SUCCESS
-          || v != i) {
+      if ((flora_msgs[i].args.get() == nullptr && args.get()) ||
+          (flora_msgs[i].args.get() && args.get() == nullptr) ||
+          args->read(v) != CAPS_SUCCESS || v != i) {
         KLOGE(TAG, "received incorrect msg args, msgtype = request");
         break;
       }
@@ -203,7 +200,7 @@ int32_t TestClient::recv_get(const char* name, shared_ptr<Caps>& args,
   return 0;
 }
 
-void TestClient::c_recv_post(const char* name, uint32_t msgtype, caps_t args) {
+void TestClient::c_recv_post(const char *name, uint32_t msgtype, caps_t args) {
   int32_t i;
   int32_t v;
 
@@ -217,10 +214,9 @@ void TestClient::c_recv_post(const char* name, uint32_t msgtype, caps_t args) {
         KLOGE(TAG, "client recv invalid msgtype %u", msgtype);
       if (flora_msgs[i].c_args == 0 && args == 0)
         break;
-      if ((flora_msgs[i].c_args == 0 && args != 0)
-          || (flora_msgs[i].c_args != 0 && args == 0)
-          || caps_read_integer(args, &v) != CAPS_SUCCESS
-          || v != i) {
+      if ((flora_msgs[i].c_args == 0 && args != 0) ||
+          (flora_msgs[i].c_args != 0 && args == 0) ||
+          caps_read_integer(args, &v) != CAPS_SUCCESS || v != i) {
         KLOGE(TAG, "received incorrect msg args, msgtype = %u", msgtype);
         break;
       }
@@ -229,7 +225,7 @@ void TestClient::c_recv_post(const char* name, uint32_t msgtype, caps_t args) {
   }
 }
 
-int32_t TestClient::c_recv_get(const char* name, caps_t args, caps_t* reply) {
+int32_t TestClient::c_recv_get(const char *name, caps_t args, caps_t *reply) {
   int32_t i;
   int32_t v;
 
@@ -238,10 +234,9 @@ int32_t TestClient::c_recv_get(const char* name, caps_t args, caps_t* reply) {
       ++recv_request_counter[i];
       if (flora_msgs[i].c_args == 0 && args == 0)
         break;
-      if ((flora_msgs[i].c_args == 0 && args != 0)
-          || (flora_msgs[i].c_args != 0 && args == 0)
-          || caps_read_integer(args, &v) != CAPS_SUCCESS
-          || v != i) {
+      if ((flora_msgs[i].c_args == 0 && args != 0) ||
+          (flora_msgs[i].c_args != 0 && args == 0) ||
+          caps_read_integer(args, &v) != CAPS_SUCCESS || v != i) {
         KLOGE(TAG, "received incorrect msg args, msgtype = request");
         break;
       }

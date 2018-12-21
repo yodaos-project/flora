@@ -1,23 +1,23 @@
-#include <sys/mman.h>
 #include "reply-mgr.h"
 #include "defs.h"
-#include "ser-helper.h"
 #include "rlog.h"
+#include "ser-helper.h"
+#include <sys/mman.h>
 
 #define TAG "flora.ReplyManager"
 
 using namespace std;
-using std::chrono::steady_clock;
-using std::chrono::milliseconds;
 using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::steady_clock;
 
 namespace flora {
 namespace internal {
 
 ReplyManager::ReplyManager(uint32_t bufsize) {
   buf_size = bufsize > DEFAULT_MSG_BUF_SIZE ? bufsize : DEFAULT_MSG_BUF_SIZE;
-  buffer = (int8_t*)mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
-      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+  buffer = (int8_t *)mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   run_thread = thread([this]() { this->run(); });
 }
 
@@ -32,9 +32,9 @@ ReplyManager::~ReplyManager() {
   munmap(buffer, buf_size);
 }
 
-void ReplyManager::add_req(shared_ptr<Adapter>& sender,
-    const char* name, int32_t msgid, int32_t pending_id,
-    uint32_t timeout, AdapterList& receivers) {
+void ReplyManager::add_req(shared_ptr<Adapter> &sender, const char *name,
+                           int32_t msgid, int32_t pending_id, uint32_t timeout,
+                           AdapterList &receivers) {
   steady_clock::time_point now = steady_clock::now();
   steady_clock::time_point tp = now + milliseconds(timeout);
   PendingGetList::iterator it;
@@ -61,8 +61,9 @@ void ReplyManager::add_req(shared_ptr<Adapter>& sender,
   loop_cond.notify_one();
 }
 
-void ReplyManager::put_reply(shared_ptr<Adapter>& sender, const char* name,
-    int32_t pending_id, int32_t retcode, shared_ptr<Caps>& data) {
+void ReplyManager::put_reply(shared_ptr<Adapter> &sender, const char *name,
+                             int32_t pending_id, int32_t retcode,
+                             shared_ptr<Caps> &data) {
   lock_guard<mutex> locker(pg_mutex);
   PendingGetList::iterator it1 = pending_gets.begin();
   AdapterList::iterator it2;
@@ -108,8 +109,8 @@ void ReplyManager::run() {
     // check completed replys
     handle_completed_replys();
 
-    if (pending_gets.empty()
-        || pending_gets.front().tp_timeout == steady_clock::time_point::max())
+    if (pending_gets.empty() ||
+        pending_gets.front().tp_timeout == steady_clock::time_point::max())
       loop_cond.wait(locker);
     else
       loop_cond.wait_until(locker, pending_gets.front().tp_timeout);
@@ -123,12 +124,12 @@ void ReplyManager::handle_completed_replys() {
   PendingGetList::iterator dit;
   int32_t c;
   steady_clock::time_point now;
-  
+
   while (it != pending_gets.end()) {
     if ((*it).receivers.empty()) {
       c = ResponseSerializer::serialize_reply(
-          (*it).msg_name.c_str(), (*it).msgid,
-          (*it).replys, buffer, buf_size, (*it).sender->serialize_flags);
+          (*it).msg_name.c_str(), (*it).msgid, (*it).replys, buffer, buf_size,
+          (*it).sender->serialize_flags);
       if (c > 0)
         (*it).sender->write(buffer, c);
       dit = it;

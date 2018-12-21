@@ -7,7 +7,7 @@ using namespace flora;
 
 class TestService {
 public:
-  bool run(const char* uri, bool capi);
+  bool run(const char *uri, bool capi);
 
   void close();
 

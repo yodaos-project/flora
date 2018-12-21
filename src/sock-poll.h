@@ -1,17 +1,17 @@
 #pragma once
 
-#include <sys/select.h>
-#include <map>
-#include <memory>
-#include <string>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
+#include "disp.h"
 #include "flora-svc.h"
 #include "sock-adap.h"
-#include "disp.h"
+#include <condition_variable>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <sys/select.h>
+#include <thread>
 
-typedef std::map<int, std::shared_ptr<SocketAdapter> > AdapterMap;
+typedef std::map<int, std::shared_ptr<SocketAdapter>> AdapterMap;
 // typedef std::list<std::shared_ptr<Session> > SessionList;
 // typedef std::map<std::string, SessionList> SubscribeMap;
 
@@ -20,11 +20,11 @@ namespace internal {
 
 class SocketPoll : public flora::Poll {
 public:
-  SocketPoll(const std::string& name);
+  explicit SocketPoll(const std::string &name);
 
-  SocketPoll(const std::string& host, int32_t port);
+  SocketPoll(const std::string &host, int32_t port);
 
-  int32_t start(std::shared_ptr<flora::Dispatcher>& disp);
+  int32_t start(std::shared_ptr<flora::Dispatcher> &disp);
 
   void stop();
 
@@ -39,11 +39,11 @@ private:
 
   void delete_adapter(int fd);
 
-  bool read_from_client(std::shared_ptr<SocketAdapter>& adap);
+  bool read_from_client(std::shared_ptr<SocketAdapter> &adap);
 
   int get_listen_fd();
 
-  int32_t do_poll(fd_set* rfds, int max_fd);
+  int32_t do_poll(fd_set *rfds, int max_fd);
 
 private:
   std::shared_ptr<Dispatcher> dispatcher;

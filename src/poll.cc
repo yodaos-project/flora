@@ -5,7 +5,7 @@
 using namespace std;
 using namespace rokid;
 
-shared_ptr<flora::Poll> flora::Poll::new_instance(const char* uri) {
+shared_ptr<flora::Poll> flora::Poll::new_instance(const char *uri) {
   Uri urip;
   if (!urip.parse(uri))
     return nullptr;
@@ -19,7 +19,7 @@ shared_ptr<flora::Poll> flora::Poll::new_instance(const char* uri) {
   return nullptr;
 }
 
-int32_t flora_poll_new(const char* uri, flora_poll_t* result) {
+int32_t flora_poll_new(const char *uri, flora_poll_t *result) {
   if (result == nullptr)
     return FLORA_POLL_INVAL;
   Uri urip;
@@ -39,19 +39,19 @@ int32_t flora_poll_new(const char* uri, flora_poll_t* result) {
 
 void flora_poll_delete(flora_poll_t handle) {
   if (handle)
-    delete reinterpret_cast<flora::Poll*>(handle);
+    delete reinterpret_cast<flora::Poll *>(handle);
 }
 
 int32_t flora_poll_start(flora_poll_t handle, flora_dispatcher_t dispatcher) {
   if (handle == 0 || dispatcher == 0)
     return FLORA_POLL_INVAL;
-  flora::Poll* fpoll = reinterpret_cast<flora::Poll*>(handle);
-  flora::Dispatcher* disp = reinterpret_cast<flora::Dispatcher*>(dispatcher);
-  shared_ptr<flora::Dispatcher> pdisp(disp, [](flora::Dispatcher*) {});
+  flora::Poll *fpoll = reinterpret_cast<flora::Poll *>(handle);
+  flora::Dispatcher *disp = reinterpret_cast<flora::Dispatcher *>(dispatcher);
+  shared_ptr<flora::Dispatcher> pdisp(disp, [](flora::Dispatcher *) {});
   return fpoll->start(pdisp);
 }
 
 void flora_poll_stop(flora_poll_t handle) {
   if (handle)
-    reinterpret_cast<flora::Poll*>(handle)->stop();
+    reinterpret_cast<flora::Poll *>(handle)->stop();
 }
