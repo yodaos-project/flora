@@ -19,22 +19,14 @@ public:
   static int32_t serialize_unsubscribe(const char *name, void *data,
                                        uint32_t size, uint32_t flags);
 
-  static int32_t serialize_declare_method(const char *name, void *data,
-                                          uint32_t size, uint32_t flags);
-
-  static int32_t serialize_remove_method(const char *name, void *data,
-                                         uint32_t size, uint32_t flags);
-
+  // when 'msgtype' == FLORA_MSGTYPE_REQUEST, 'id', 'timeout'参数有效
   static int32_t serialize_post(const char *name, uint32_t msgtype,
-                                std::shared_ptr<Caps> &args, void *data,
-                                uint32_t size, uint32_t flags);
-
-  static int32_t serialize_call(const char *name, std::shared_ptr<Caps> &args,
-                                const char *target, int32_t id,
+                                std::shared_ptr<Caps> &args, int32_t id,
                                 uint32_t timeout, void *data, uint32_t size,
                                 uint32_t flags);
 
-  static int32_t serialize_reply(int32_t id, Reply &reply, void *data,
+  static int32_t serialize_reply(const char *name, std::shared_ptr<Caps> &args,
+                                 int32_t id, int32_t retcode, void *data,
                                  uint32_t size, uint32_t flags);
 };
 
@@ -44,15 +36,12 @@ public:
                                 uint32_t flags);
 
   static int32_t serialize_post(const char *name, uint32_t msgtype,
-                                std::shared_ptr<Caps> &args, void *data,
-                                uint32_t size, uint32_t flags);
+                                std::shared_ptr<Caps> &args, int32_t id,
+                                void *data, uint32_t size, uint32_t flags);
 
-  static int32_t serialize_call(const char *name, std::shared_ptr<Caps> &args,
-                                int32_t id, void *data, uint32_t size,
-                                uint32_t flags);
-
-  static int32_t serialize_reply(int32_t id, int32_t rescode, Response *reply,
-                                 void *data, uint32_t size, uint32_t flags);
+  static int32_t serialize_reply(const char *name, int32_t id,
+                                 ResponseArray &datas, void *data,
+                                 uint32_t size, uint32_t flags);
 };
 
 class RequestParser {
@@ -66,21 +55,13 @@ public:
   static int32_t parse_unsubscribe(std::shared_ptr<Caps> &caps,
                                    std::string &name);
 
-  static int32_t parse_declare_method(std::shared_ptr<Caps> &caps,
-                                      std::string &name);
-
-  static int32_t parse_remove_method(std::shared_ptr<Caps> &caps,
-                                     std::string &name);
-
   static int32_t parse_post(std::shared_ptr<Caps> &caps, std::string &name,
-                            uint32_t &msgtype, std::shared_ptr<Caps> &args);
-
-  static int32_t parse_call(std::shared_ptr<Caps> &caps, std::string &name,
-                            std::shared_ptr<Caps> &args, std::string &target,
+                            uint32_t &msgtype, std::shared_ptr<Caps> &args,
                             int32_t &id, uint32_t &timeout);
 
-  static int32_t parse_reply(std::shared_ptr<Caps> &caps, int32_t &id,
-                             Reply &reply);
+  static int32_t parse_reply(std::shared_ptr<Caps> &caps, std::string &name,
+                             std::shared_ptr<Caps> &args, int32_t &id,
+                             int32_t &retcode);
 };
 
 class ResponseParser {
@@ -88,13 +69,11 @@ public:
   static int32_t parse_auth(const void *data, uint32_t size, int32_t &result);
 
   static int32_t parse_post(std::shared_ptr<Caps> &caps, std::string &name,
-                            uint32_t &msgtype, std::shared_ptr<Caps> &args);
+                            uint32_t &msgtype, std::shared_ptr<Caps> &args,
+                            int32_t &id);
 
-  static int32_t parse_call(std::shared_ptr<Caps> &caps, std::string &name,
-                            std::shared_ptr<Caps> &args, int32_t &id);
-
-  static int32_t parse_reply(std::shared_ptr<Caps> &caps, int32_t &id,
-                             int32_t &rescode, Response &reply);
+  static int32_t parse_reply(std::shared_ptr<Caps> &caps, std::string &name,
+                             ResponseArray &replys);
 };
 
 bool is_valid_msgtype(uint32_t msgtype);

@@ -22,20 +22,19 @@ public:
 
   void do_post();
 
-  void do_call(int32_t clinum);
-
   void reset();
 
   void close();
 
   void recv_post(const char *name, uint32_t msgtype, shared_ptr<Caps> &msg);
 
-  void recv_call(const char *name, shared_ptr<Caps> &msg, Reply &reply);
+  int32_t recv_get(const char *name, shared_ptr<Caps> &msg,
+                   shared_ptr<Caps> &reply);
 
 private:
   void c_recv_post(const char *name, uint32_t msgtype, caps_t args);
 
-  void c_recv_call(const char *name, caps_t args, flora_call_reply *reply);
+  int32_t c_recv_get(const char *name, caps_t args, caps_t *reply);
 
 public:
   static void static_init(bool capi);
@@ -48,16 +47,15 @@ private:
   static void recv_post_s(const char *name, uint32_t msgtype, caps_t msg,
                           void *arg);
 
-  static void recv_call_s(const char *name, caps_t msg, void *arg,
-                          flora_call_reply *reply);
+  static int32_t recv_get_s(const char *name, caps_t msg, void *arg,
+                            caps_t *reply);
 
 public:
   int8_t subscribe_flags[FLORA_MSG_COUNT];
-  int8_t declare_method_flags[FLORA_MSG_COUNT];
   int32_t post_counter[FLORA_MSG_COUNT];
-  int32_t call_counter[FLORA_MSG_COUNT];
-  int32_t recv_post_counter[FLORA_MSG_COUNT];
-  int32_t recv_call_counter[FLORA_MSG_COUNT];
+  int32_t recv_instant_counter[FLORA_MSG_COUNT];
+  int32_t recv_persist_counter[FLORA_MSG_COUNT];
+  int32_t recv_request_counter[FLORA_MSG_COUNT];
 
 private:
   shared_ptr<Client> flora_cli;

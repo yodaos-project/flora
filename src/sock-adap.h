@@ -1,7 +1,6 @@
 #pragma once
 
 #include "adap.h"
-#include <mutex>
 
 #define HEADER_SIZE 8
 
@@ -31,10 +30,7 @@ public:
 
   void close() override;
 
-  bool closed() override;
-
-private:
-  void close_nolock();
+  bool closed() const override;
 
 private:
   int socket;
@@ -42,5 +38,4 @@ private:
   uint32_t buf_size;
   uint32_t cur_size = 0;
   uint32_t frame_begin = 0;
-  std::mutex write_mutex;
 };

@@ -13,17 +13,11 @@
 #define FLORA_CLI_ETIMEOUT -4
 // 'get'请求目标不存在
 #define FLORA_CLI_ENEXISTS -5
-// 客户端id已被占用
-// uri '#' 字符后面的字符串是客户端id
-#define FLORA_CLI_EDUPID -6
-// 缓冲区大小不足
-#define FLORA_CLI_EINSUFF_BUF -7
-// 客户端主动关闭
-#define FLORA_CLI_ECLOSED -8
 
 #define FLORA_MSGTYPE_INSTANT 0
 #define FLORA_MSGTYPE_PERSIST 1
-#define FLORA_NUMBER_OF_MSGTYPE 2
+#define FLORA_MSGTYPE_REQUEST 2
+#define FLORA_NUMBER_OF_MSGTYPE 3
 
 #ifdef __cplusplus
 #include <functional>
@@ -57,26 +51,17 @@ public:
 
   virtual int32_t unsubscribe(const char *name) = 0;
 
-  virtual int32_t declare_method(const char *name) = 0;
-
-  virtual int32_t remove_method(const char *name) = 0;
-
   virtual int32_t post(const char *name, std::shared_ptr<Caps> &msg,
                        uint32_t msgtype) = 0;
 
-  virtual int32_t call(const char *name, std::shared_ptr<Caps> &msg,
-                       const char *target, Response &reply,
-                       uint32_t timeout = 0) = 0;
+  virtual int32_t get(const char *name, std::shared_ptr<Caps> &msg,
+                      ResponseArray &replys, uint32_t timeout = 0) = 0;
 
-  virtual int32_t call(const char *name, std::shared_ptr<Caps> &msg,
-                       const char *target,
-                       std::function<void(int32_t, Response &)> &&cb,
-                       uint32_t timeout = 0) = 0;
+  virtual int32_t get(const char *name, std::shared_ptr<Caps> &msg,
+                      std::function<void(ResponseArray &)> &&cb) = 0;
 
-  virtual int32_t call(const char *name, std::shared_ptr<Caps> &msg,
-                       const char *target,
-                       std::function<void(int32_t, Response &)> &cb,
-                       uint32_t timeout = 0) = 0;
+  virtual int32_t get(const char *name, std::shared_ptr<Caps> &msg,
+                      std::function<void(ResponseArray &)> &cb) = 0;
 
   static int32_t connect(const char *uri, ClientCallback *cb,
                          uint32_t msg_buf_size,
@@ -90,8 +75,8 @@ public:
   virtual void recv_post(const char *name, uint32_t msgtype,
                          std::shared_ptr<Caps> &msg) {}
 
-  virtual void recv_call(const char *name, std::shared_ptr<Caps> &msg,
-                         Reply &reply) {}
+  virtual void recv_get(const char *name, std::shared_ptr<Caps> &msg,
+                        Reply &reply) {}
 
   virtual void disconnected() {}
 };
@@ -107,17 +92,17 @@ typedef void (*flora_cli_disconnected_func_t)(void *arg);
 // 'msg': 注意，必须在函数未返回时读取msg，函数返回后读取msg非法
 typedef void (*flora_cli_recv_post_func_t)(const char *name, uint32_t msgtype,
                                            caps_t msg, void *arg);
-typedef struct {
-  int32_t ret_code;
-  caps_t data;
-} flora_call_reply;
-// 'call'请求的接收端
-// 在此函数中填充'reply'变量，客户端将把'reply'数据发回给'call'请求发送端
-typedef void (*flora_cli_recv_call_func_t)(const char *name, caps_t msg,
-                                           void *arg, flora_call_reply *reply);
+// 'get'请求的接收端
+// 在此函数中填充'resp'变量，客户端将把'resp'数据发回给'get'请求发送端
+//
+// return:
+//     FLORA_CLI_SUCCESS,  客户端将会把'resp'指定的对象发回给'get'请求发送端
+//     其它,  返回值为自定义错误码，客户端将把此错误码发回给'get'请求发送端
+typedef int32_t (*flora_cli_recv_get_func_t)(const char *name, caps_t msg,
+                                             void *arg, caps_t *resp);
 typedef struct {
   flora_cli_recv_post_func_t recv_post;
-  flora_cli_recv_call_func_t recv_call;
+  flora_cli_recv_get_func_t recv_get;
   flora_cli_disconnected_func_t disconnected;
 } flora_cli_callback_t;
 typedef struct {
@@ -128,9 +113,8 @@ typedef struct {
   // 回应请求的服务端自定义标识
   // 可能为空字串
   char *extra;
-} flora_call_result;
-typedef void (*flora_call_callback_t)(int32_t rescode,
-                                      flora_call_result *result, void *arg);
+} flora_get_result;
+typedef void (*flora_get_callback_t)(flora_get_result *results, uint32_t count);
 
 // uri: 支持的schema:
 //     tcp://$(host):$(port)/<#extra>
@@ -144,27 +128,25 @@ int32_t flora_cli_connect(const char *uri, /*int32_t async,*/
 
 void flora_cli_delete(flora_cli_t handle);
 
+// msgtype: INSTANT | PERSIST | REQUEST
 int32_t flora_cli_subscribe(flora_cli_t handle, const char *name);
 
+// msgtype: INSTANT | PERSIST | REQUEST
 int32_t flora_cli_unsubscribe(flora_cli_t handle, const char *name);
-
-int32_t flora_cli_declare_method(flora_cli_t handle, const char *name);
-
-int32_t flora_cli_remove_method(flora_cli_t handle, const char *name);
 
 // msgtype: INSTANT | PERSIST
 int32_t flora_cli_post(flora_cli_t handle, const char *name, caps_t msg,
                        uint32_t msgtype);
 
-int32_t flora_cli_call(flora_cli_t handle, const char *name, caps_t msg,
-                       const char *target, flora_call_result *result,
-                       uint32_t timeout);
+// send REQUEST msg and recv results
+int32_t flora_cli_get(flora_cli_t handle, const char *name, caps_t msg,
+                      flora_get_result **results, uint32_t *res_buf_size,
+                      uint32_t timeout);
 
-int32_t flora_cli_call_nb(flora_cli_t handle, const char *name, caps_t msg,
-                          const char *target, flora_call_callback_t cb,
-                          void *arg, uint32_t timeout);
+int32_t flora_cli_get_nb(flora_cli_t handle, const char *name, caps_t msg,
+                         flora_get_callback_t cb);
 
-void flora_result_delete(flora_call_result *result);
+void flora_result_delete(flora_get_result *results, uint32_t size);
 
 #ifdef __cplusplus
 } // namespace flora

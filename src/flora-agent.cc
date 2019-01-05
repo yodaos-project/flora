@@ -33,18 +33,12 @@ void Agent::config(uint32_t key, va_list ap) {
   }
 }
 
-void Agent::subscribe(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, uint32_t)> &&cb) {
-  subscribe(name, cb);
-}
-
-void Agent::subscribe(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, uint32_t)> &cb) {
+void Agent::subscribe(const char *name,
+                      function<void(const char *name, shared_ptr<Caps> &,
+                                    uint32_t, Reply *)> &&cb) {
   shared_ptr<Client> cli;
   conn_mutex.lock();
-  auto r = post_handlers.insert(make_pair(name, cb));
+  auto r = msg_handlers.insert(make_pair(name, cb));
   cli = flora_cli;
   conn_mutex.unlock();
   if (r.second && cli.get())
@@ -53,50 +47,17 @@ void Agent::subscribe(
 
 void Agent::unsubscribe(const char *name) {
   shared_ptr<Client> cli;
-  PostHandlerMap::iterator it;
+  MsgHandlerMap::iterator it;
 
   conn_mutex.lock();
-  it = post_handlers.find(name);
-  if (it != post_handlers.end()) {
-    post_handlers.erase(it);
+  it = msg_handlers.find(name);
+  if (it != msg_handlers.end()) {
+    msg_handlers.erase(it);
     cli = flora_cli;
   }
   conn_mutex.unlock();
   if (cli.get())
     cli->unsubscribe(name);
-}
-
-void Agent::declare_method(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, Reply &)> &&cb) {
-  declare_method(name, cb);
-}
-
-void Agent::declare_method(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, Reply &)> &cb) {
-  shared_ptr<Client> cli;
-  conn_mutex.lock();
-  auto r = call_handlers.insert(make_pair(name, cb));
-  cli = flora_cli;
-  conn_mutex.unlock();
-  if (r.second && cli.get())
-    cli->declare_method(name);
-}
-
-void Agent::remove_method(const char *name) {
-  shared_ptr<Client> cli;
-  CallHandlerMap::iterator it;
-
-  conn_mutex.lock();
-  it = call_handlers.find(name);
-  if (it != call_handlers.end()) {
-    call_handlers.erase(it);
-    cli = flora_cli;
-  }
-  conn_mutex.unlock();
-  if (cli.get())
-    cli->remove_method(name);
 }
 
 void Agent::start(bool block) {
@@ -137,14 +98,10 @@ void Agent::run() {
 }
 
 void Agent::subscribe_msgs(shared_ptr<Client> &cli) {
-  PostHandlerMap::iterator pit;
-  CallHandlerMap::iterator cit;
+  MsgHandlerMap::iterator it;
 
-  for (pit = post_handlers.begin(); pit != post_handlers.end(); ++pit) {
-    cli->subscribe((*pit).first.c_str());
-  }
-  for (cit = call_handlers.begin(); cit != call_handlers.end(); ++cit) {
-    cli->declare_method((*cit).first.c_str());
+  for (it = msg_handlers.begin(); it != msg_handlers.end(); ++it) {
+    cli->subscribe((*it).first.c_str());
   }
 }
 
@@ -154,8 +111,6 @@ void Agent::close() {
     working = false;
     conn_cond.notify_one();
     flora_cli.reset();
-    post_handlers.clear();
-    call_handlers.clear();
     locker.unlock();
     if (run_thread.joinable())
       run_thread.join();
@@ -179,8 +134,8 @@ int32_t Agent::post(const char *name, shared_ptr<Caps> &msg, uint32_t msgtype) {
   return r;
 }
 
-int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
-                    Response &response, uint32_t timeout) {
+int32_t Agent::get(const char *name, shared_ptr<Caps> &msg,
+                   ResponseArray &responses, uint32_t timeout) {
   shared_ptr<Client> cli;
 
   conn_mutex.lock();
@@ -190,21 +145,20 @@ int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
   if (cli.get() == nullptr) {
     return FLORA_CLI_ECONN;
   }
-  int32_t r = cli->call(name, msg, target, response, timeout);
+  int32_t r = cli->get(name, msg, responses, timeout);
   if (r == FLORA_CLI_ECONN) {
     destroy_client();
   }
   return r;
 }
 
-int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
-                    function<void(int32_t, Response &)> &&cb,
-                    uint32_t timeout) {
-  return call(name, msg, target, cb, timeout);
+int32_t Agent::get(const char *name, shared_ptr<Caps> &msg,
+                   function<void(ResponseArray &)> &&cb) {
+  return get(name, msg, cb);
 }
 
-int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
-                    function<void(int32_t, Response &)> &cb, uint32_t timeout) {
+int32_t Agent::get(const char *name, shared_ptr<Caps> &msg,
+                   function<void(ResponseArray &)> &cb) {
   shared_ptr<Client> cli;
 
   conn_mutex.lock();
@@ -214,7 +168,7 @@ int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
   if (cli.get() == nullptr) {
     return FLORA_CLI_ECONN;
   }
-  int32_t r = cli->call(name, msg, target, cb, timeout);
+  int32_t r = cli->get(name, msg, cb);
   if (r == FLORA_CLI_ECONN) {
     destroy_client();
   }
@@ -231,22 +185,20 @@ void Agent::destroy_client() {
 void Agent::recv_post(const char *name, uint32_t msgtype,
                       shared_ptr<Caps> &msg) {
   unique_lock<mutex> locker(conn_mutex);
-  PostHandlerMap::iterator it = post_handlers.find(name);
-  if (it != post_handlers.end()) {
+  MsgHandlerMap::iterator it = msg_handlers.find(name);
+  if (it != msg_handlers.end()) {
     auto cb = it->second;
     locker.unlock();
-    cb(name, msg, msgtype);
+    cb(name, msg, msgtype, nullptr);
   }
 }
 
-void Agent::recv_call(const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-  unique_lock<mutex> locker(conn_mutex);
-  CallHandlerMap::iterator it = call_handlers.find(name);
-  if (it != call_handlers.end()) {
-    auto cb = it->second;
-    locker.unlock();
-    cb(name, msg, reply);
-  }
+void Agent::recv_get(const char *name, shared_ptr<Caps> &msg, Reply &reply) {
+  conn_mutex.lock();
+  MsgHandlerMap::iterator it = msg_handlers.find(name);
+  auto cb = it->second;
+  conn_mutex.unlock();
+  cb(name, msg, FLORA_MSGTYPE_REQUEST, &reply);
 }
 
 void Agent::disconnected() {
@@ -273,36 +225,24 @@ void flora_agent_config(flora_agent_t agent, uint32_t key, ...) {
 void flora_agent_subscribe(flora_agent_t agent, const char *name,
                            flora_agent_subscribe_callback_t cb, void *arg) {
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
-  cxxagent->subscribe(
-      name, [cb, arg](const char *name, shared_ptr<Caps> &msg, uint32_t type) {
-        caps_t cmsg = Caps::convert(msg);
-        cb(name, cmsg, type, arg);
-        caps_destroy(cmsg);
-      });
+  cxxagent->subscribe(name, [cb, arg](const char *name, shared_ptr<Caps> &msg,
+                                      uint32_t type, Reply *reply) {
+    caps_t cmsg = Caps::convert(msg);
+    flora_reply_t creply;
+    memset(&creply, 0, sizeof(creply));
+    cb(name, cmsg, type, &creply, arg);
+    caps_destroy(cmsg);
+    if (type == FLORA_MSGTYPE_REQUEST) {
+      reply->ret_code = creply.ret_code;
+      reply->data = Caps::convert(creply.data);
+    }
+    caps_destroy(creply.data);
+  });
 }
 
 void flora_agent_unsubscribe(flora_agent_t agent, const char *name) {
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
   cxxagent->unsubscribe(name);
-}
-
-void flora_agent_declare_method(flora_agent_t agent, const char *name,
-                                flora_agent_declare_method_callback_t cb,
-                                void *arg) {
-  Agent *cxxagent = reinterpret_cast<Agent *>(agent);
-  cxxagent->declare_method(
-      name, [cb, arg](const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-        caps_t cmsg = Caps::convert(msg);
-        flora_reply_t creply;
-        memset(&creply, 0, sizeof(creply));
-        cb(name, cmsg, &creply, arg);
-        reply.ret_code = creply.ret_code;
-        if (creply.data) {
-          reply.data = Caps::convert(creply.data);
-          caps_destroy(creply.data);
-        }
-        caps_destroy(cmsg);
-      });
 }
 
 void flora_agent_start(flora_agent_t agent, int32_t block) {
@@ -322,37 +262,39 @@ int32_t flora_agent_post(flora_agent_t agent, const char *name, caps_t msg,
   return cxxagent->post(name, cxxmsg, msgtype);
 }
 
-void cxxresp_to_cresp(Response &resp, flora_call_result &result);
-int32_t flora_agent_call(flora_agent_t agent, const char *name, caps_t msg,
-                         const char *target, flora_call_result *result,
-                         uint32_t timeout) {
+void cxxreplys_to_creplys(ResponseArray &replys, flora_get_result *results);
+int32_t flora_agent_get(flora_agent_t agent, const char *name, caps_t msg,
+                        flora_get_result **results, uint32_t *res_size,
+                        uint32_t timeout) {
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
   shared_ptr<Caps> cxxmsg = Caps::convert(msg);
-  Response resp;
-  int32_t r = cxxagent->call(name, cxxmsg, target, resp, timeout);
+  ResponseArray resps;
+  int32_t r = cxxagent->get(name, cxxmsg, resps, timeout);
   if (r != FLORA_CLI_SUCCESS)
     return r;
-  if (result)
-    cxxresp_to_cresp(resp, *result);
+  if (resps.empty()) {
+    *res_size = 0;
+    *results = nullptr;
+  }
+  *results = new flora_get_result[resps.size()];
+  cxxreplys_to_creplys(resps, *results);
+  *res_size = resps.size();
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t flora_agent_call_nb(flora_agent_t agent, const char *name, caps_t msg,
-                            const char *target, flora_call_callback_t cb,
-                            void *arg, uint32_t timeout) {
+int32_t flora_agent_get_nb(flora_agent_t agent, const char *name, caps_t msg,
+                           flora_agent_get_callback_t cb, void *arg) {
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
   shared_ptr<Caps> cxxmsg = Caps::convert(msg);
-  return cxxagent->call(name, cxxmsg, target,
-                        [cb, arg](int32_t rescode, Response &resp) {
-                          flora_call_result result;
-                          if (rescode == FLORA_CLI_SUCCESS) {
-                            cxxresp_to_cresp(resp, result);
-                            cb(rescode, &result, arg);
-                          } else {
-                            cb(rescode, nullptr, arg);
-                          }
-                        },
-                        timeout);
+  return cxxagent->get(name, cxxmsg, [cb, arg](ResponseArray &resps) {
+    if (resps.empty()) {
+      cb(nullptr, 0, arg);
+    } else {
+      flora_get_result *results = new flora_get_result[resps.size()];
+      cxxreplys_to_creplys(resps, results);
+      cb(results, resps.size(), arg);
+    }
+  });
 }
 
 void flora_agent_delete(flora_agent_t agent) {

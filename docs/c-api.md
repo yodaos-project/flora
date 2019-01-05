@@ -7,57 +7,47 @@ flora_agent_config(agent, FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#exam
 flora_agent_config(agent, FLORA_AGENT_CONFIG_BUFSIZE, 80 * 1024);
 flora_agent_config(agent, FLORA_AGENT_CONFIG_RECONN_INTERVAL, 5000);
 
-static void foo_sub_callback(const char* name, caps_t msg, uint32_t type, void* arg) {
+static void foo_callback(caps_t msg, uint32_t type, flora_reply_t* reply, void* arg) {
 	int32_t iv;
-	char* str;
+  char* str;
 	caps_read_integer(msg, &iv);  // read integer 1
 	caps_read_string(msg, &str);  // read string "hello"
+	if (type == FLORA_MSGTYPE_REQUEST) {
+		// fill 'reply' content here
+		// message sender will received the reply content
+		reply->ret_code = 0;
+		reply->data = caps_create();
+		caps_write_string(reply->data, "world");
+	}
 }
-static void foo_method_callback(const char* name, caps_t msg, flora_reply_t* reply, void* arg) {
-	// fill 'reply' content here
-	// message sender will received the reply content
-	reply->ret_code = 0;
-	reply->data = caps_create();
-	caps_write_string(reply->data, "world");
-}
-
-// 最后参数(void*)1 为可选项，将传入foo_sub_callback
-flora_agent_subscribe(agent, "foo", foo_sub_callback, (void*)1);
-flora_agent_declare_method(agent, "foo", foo_method_callback, (void*)2);
-
-// flora_agent_start(agent, bufsize), bufsize minimal value 32768.
-// if 'bufsize' < minimal value, 'bufsize' will set to minimal value.
+// 最后参数(void*)1 为可选项，将传入foo_callback
+flora_agent_subscribe(agent, "foo", foo_callback, (void*)1);
 flora_agent_start(agent, 0);
-
-// post message
 caps_t msg = caps_create();
 caps_write_integer(msg, 1);
 caps_write_string(msg, "hello");
 flora_agent_post(agent, "foo", msg, FLORA_MSGTYPE_INSTANT);
-
-// rpc call
-flora_call_result result;
-// flora_agent_call(agent, methodName, methodParams, targetName, result, timeout)
-// if timeout == 0, use default timeout
-if (flora_agent_call(agent, "foo", msg, "exam-agent", &result, 0) == FLORA_CLI_SUCCESS) {
-	result->ret_code;
-	result->data;
-	result->sender;
-	flora_result_delete(&result);
+flora_get_result* results;
+uint32_t res_size;
+if (flora_agent_get(agent, "foo", msg, &results, &res_size, 0) == FLORA_CLI_SUCCESS) {
+  uint32_t i;
+  for (i = 0; i < res_size; ++i) {
+    results[i].ret_code;
+    results[i].data;
+    results[i].sender;
+  }
+  flora_result_delete(results, res_size);
 }
 
-static void foo_return_callback(int32_t rescode, flora_result_t* result, void* arg) {
-	if (rescode == FLORA_CLI_SUCCESS) {
-		// result->ret_code;  // ret_code will be 0
-		// result->sender;  // sender will be "exam-agent"
-		char* str;
-		caps_read_string(result->data, &str);  // str will be "world"
-	}
+static void get_foo_callback(flora_result_t* results, uint32_t size, void* arg) {
+	// results[0].ret_code;  // ret_code will be 0
+	// results[0].sender;  // sender will be "exam-agent"
+	char* str;
+	caps_read_string(results[0].data, &str);  // str will be "world"
+  flora_result_delete(results, size);
 }
-// flora_agent_call_nb(agent, methodName, methodParams, targetName, callback, arg, timeout)
-// 如果超时，foo_return_callback第一个参数rescode值为FLORA_CLI_ETIMEOUT, result参数为空指针
-// 最后参数(void*)2 为可选项，将传入foo_return_callback
-flora_agent_call_nb(agent, "foo", msg, "exam-agent", foo_return_callback, (void*)2, 0);
+// 最后参数(void*)2 为可选项，将传入get_foo_callback
+flora_agent_get_nb(agent, "foo", msg, get_foo_callback, (void*)2);
 caps_destroy(msg);
 flora_agent_close(agent);
 flora_agent_delete(agent);
@@ -103,21 +93,6 @@ name | type | default | description
 --- | --- | --- | ---
 agent | flora\_agent\_t | |
 name | const char* | | 消息名称
-
----
-
-### flora\_agent\_declare\_method(agent, name, cb, arg)
-
-声明远程方法
-
-#### Parameters
-
-name | type | default | description
---- | --- | --- | ---
-agent | flora\_agent\_t | |
-name | const char* | | 远程方法名称
-cb | [flora\_agent\_declare\_method\_callback\_t](#DeclareMethodCallback) | | 回调函数
-arg | void* | |
 
 ---
 
@@ -171,20 +146,20 @@ FLORA\_CLI\_ECONN | flora service连接错误
 
 ---
 
-### flora\_agent\_call(agent, name, msg, target, result, timeout)
+### flora\_agent\_get(agent, name, msg, results, res_size, timeout)
 
-远程方法调用(同步)
+发送消息并等待另一客户端回复消息
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
 agent | flora\_agent\_t | |
-name | const char* | | 远程方法名称
-msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 方法参数
-target | const char* | | 远程方法声明客户端id
-result | [flora\_result\_t](#Result)* | | 远程方法返回信息
-timeout | uint32_t | 0 | 等待回复的超时时间，0表示使用默认超时。
+name | const char* | | 消息名称
+msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
+results | [flora\_result\_t](#Result)** | | 收到的回复消息
+res_size | uint32_t* | | results size
+timeout | uint32_t | 0 | 等待回复的超时时间，0表示无超时。
 
 #### returns
 
@@ -196,25 +171,22 @@ FLORA\_CLI\_SUCCESS | 成功
 FLORA\_CLI\_EINVAL | 参数非法
 FLORA\_CLI\_ECONN | flora service连接错误
 FLORA\_CLI\_ETIMEOUT | 超时无回复
-FLORA\_CLI\_ENEXISTS | 远程方法未找到
 
 ---
 
-### flora\_agent\_call\_nb(agent, name, msg, target, cb, arg, timeout)
+### flora\_agent\_get(agent, name, msg, cb, arg)
 
-远程方法调用(异步回调)
+发送消息并等待另一客户端回复消息
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
 agent | flora\_agent\_t | |
-name | const char* | | 远程方法名称
-msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 方法参数
-target | const char* | | 远程方法声明客户端id
-cb | [flora\_call\_callback\_t](#CallCallback) | | 回调函数
+name | const char* | | 消息名称
+msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
+cb | [flora\_agent\_get\_callback\_t](#GetCallback) | | 回调函数
 arg | void* | |
-timeout | uint32_t | 0 | 等待回复的超时时间，0表示使用默认超时。
 
 #### returns
 
@@ -230,7 +202,7 @@ FLORA_CLI_ECONN | flora service连接错误
 
 ## Definition
 
-### <a id="SubscribeCallback"></a>flora\_agent\_subscribe\_callback\_t(name, msg, type, arg)
+### <a id="SubscribeCallback"></a>flora\_agent\_subscribe\_callback\_t(msg, type, reply, arg)
 
 回调函数：收到订阅的消息
 
@@ -238,35 +210,22 @@ FLORA_CLI_ECONN | flora service连接错误
 
 name | type | description
 --- | --- | ---
-name | string | 消息名称
 msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
-type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST
-arg | void* | subscribe传入的参数arg
+type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST<br>FLORA_MSGTYPE_REQUEST
+reply | [flora\_reply\_t](#Reply)\* | 当type == FLORA_MSGTYPE_REQUEST时，填充reply指向的结构体，给消息发送者回复数据
+arg | void* | | subscribe传入的参数arg
 
-### <a id="DeclareMethodCallback"></a>flora\_agent\_declare\_method\_callback\_t(name, msg, reply, arg)
+### <a id="GetCallback"></a>flora_agent\_get\_callback\_t(results, size, arg)
 
-回调函数：远程方法被调用
-
-#### Parameters
-
-name | type | description
---- | --- | ---
-name | string | 远程方法名称
-msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 方法参数
-reply | [flora\_reply\_t](#Reply)\* | 填充reply指向的结构体，给远程方法调用者返回数据
-arg | void* | declare_method传入的参数arg
-
-### <a id="CallCallback"></a>flora_call\_callback\_t(rescode, result, arg)
-
-回调函数：远程方法调用返回值
+回调函数：收到回复的消息
 
 #### Parameters
 
 name | type | description
 --- | --- | ---
-rescode | int32_t | 远程方法调用错误码
-result | [flora\_result\_t](#Result)* | 远程方法调用返回值
-arg | void* | call_nb传入的参数arg
+results | [flora\_result\_t](#Result)** | | 回复的消息数组<br>'get'请求的每个订阅者回复一个消息内容，所以数组的长度等于消息的订阅者数量。
+size | uint32_t* | | results size
+arg | void* | | get传入的参数arg
 
 ### <a id="Reply"></a>flora\_reply\_t
 
@@ -275,7 +234,7 @@ arg | void* | call_nb传入的参数arg
 name | type | description
 --- | --- | ---
 ret_code | int32_t | 返回码，0为成功。
-data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | 返回数据
+data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
 
 ### <a id="Response"></a>flora\_result\_t
 
@@ -284,8 +243,8 @@ data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | 返�
 name | type | description
 --- | --- | ---
 ret_code | int32_t | 返回码，由消息订阅者设置，0为成功。
-data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | 远程方法返回数据
-sender | string | 远程方法定义者身份标识
+data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
+sender | const char* | 消息订阅者的身份标识，可选项。
 
 # 2. <a id="dispatcher"></a>Dispatcher
 
@@ -307,8 +266,6 @@ bufsize | uint32_t | 0 | 消息缓冲区大小（决定了一个消息最大大�
 
 Type: flora_dispatcher_t
 
----
-
 ### flora_dispatcher_delete(dispatcher)
 
 销毁Dispatcher对象
@@ -318,33 +275,6 @@ Type: flora_dispatcher_t
 name | type | default | description
 --- | --- | --- | ---
 dispatcher | flora_dispatcher_t | |
-
----
-
-### flora_dispatcher_run(dispatcher, block)
-
-开始运行
-
-#### Parameters
-
-name | type | default | descriptions
---- | --- | --- | ---
-dispatcher | flora_dispatcher_t | |
-block | int32_t | | 0: 异步运行模式，此函数立即返回<br>1: 同步运行模式，此函数阻塞直至flora_dispatcher_close被调用
-
----
-
-### flora_dispatcher_close(dispatcher)
-
-停止运行
-
-#### Parameters
-
-name | type | default | descriptions
---- | --- | --- | ---
-dispatcher | flora_dispatcher_t | |
-
----
 
 # 3. <a id="poll"></a>Poll
 

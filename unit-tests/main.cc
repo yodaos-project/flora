@@ -88,8 +88,6 @@ static bool parse_cmdline(int argc, char **argv, CmdlineArgs *args) {
 
 static bool check_results(TestClient *clients, int32_t num) {
   int32_t total_post_counter[FLORA_MSG_COUNT];
-  int32_t total_call_counter[FLORA_MSG_COUNT];
-  int32_t total_recv_call_counter[FLORA_MSG_COUNT];
   int32_t i, j;
 
   memset(total_post_counter, 0, sizeof(total_post_counter));
@@ -98,36 +96,49 @@ static bool check_results(TestClient *clients, int32_t num) {
       total_post_counter[j] += clients[i].post_counter[j];
     }
   }
-  memset(total_call_counter, 0, sizeof(total_call_counter));
-  memset(total_recv_call_counter, 0, sizeof(total_recv_call_counter));
 
   for (i = 0; i < num; ++i) {
     for (j = 0; j < FLORA_MSG_COUNT; ++j) {
       if (clients[i].subscribe_flags[j]) {
-        if (clients[i].recv_post_counter[j] != total_post_counter[j]) {
-          KLOGE(TAG, "client %d, msg %d recv/post not equal %d/%d", i, j,
-                clients[i].recv_post_counter[j], total_post_counter[j]);
+        if (clients[i].recv_instant_counter[j] != total_post_counter[j]) {
+          KLOGE(TAG, "client %d, msg(instant) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_instant_counter[j], total_post_counter[j]);
+          return false;
+        }
+        if (clients[i].recv_persist_counter[j] != total_post_counter[j]) {
+          KLOGE(TAG, "client %d, msg(persist) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_persist_counter[j], total_post_counter[j]);
+          return false;
+        }
+        if (clients[i].recv_request_counter[j] != total_post_counter[j]) {
+          KLOGE(TAG, "client %d, msg(request) %d recv/post not equal %d/%d", i,
+                j, clients[i].recv_request_counter[j], total_post_counter[j]);
           return false;
         }
       }
       if (clients[i].subscribe_flags[j] == 0) {
-        if (clients[i].recv_post_counter[j] != 0) {
+        if (clients[i].recv_instant_counter[j] != 0) {
           KLOGE(TAG,
-                "client %d, msg %d should not received, but recv %d "
+                "client %d, msg(instant) %d should not received, but recv %d "
                 "times",
-                i, j, clients[i].recv_post_counter[j]);
+                i, j, clients[i].recv_instant_counter[j]);
+          return false;
+        }
+        if (clients[i].recv_persist_counter[j] != 0) {
+          KLOGE(TAG,
+                "client %d, msg(persist) %d should not received, but recv %d "
+                "times",
+                i, j, clients[i].recv_persist_counter[j]);
+          return false;
+        }
+        if (clients[i].recv_request_counter[j] != 0) {
+          KLOGE(TAG,
+                "client %d, msg(request) %d should not received, but recv %d "
+                "times",
+                i, j, clients[i].recv_request_counter[j]);
           return false;
         }
       }
-      total_call_counter[j] = clients[i].call_counter[j];
-      total_recv_call_counter[j] = clients[i].recv_call_counter[j];
-    }
-  }
-  for (i = 0; i < FLORA_MSG_COUNT; ++i) {
-    if (total_call_counter[i] != total_recv_call_counter[i]) {
-      KLOGE(TAG, "msg %d recv/call not equal %d/%d", i,
-            total_recv_call_counter[i], total_call_counter[i]);
-      return false;
     }
   }
   KLOGI(TAG, "test success");

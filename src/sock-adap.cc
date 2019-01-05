@@ -1,15 +1,12 @@
 #include "sock-adap.h"
 #include "caps.h"
 #include "rlog.h"
-#include <chrono>
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #define TAG "flora.SocketAdapter"
-
-using namespace std;
 
 SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
     : Adapter(flags), socket(sock) {
@@ -78,29 +75,19 @@ nomore:
 }
 
 void SocketAdapter::close() {
-  lock_guard<mutex> locker(write_mutex);
-  close_nolock();
-}
-
-void SocketAdapter::close_nolock() {
   if (buffer) {
     munmap(buffer, buf_size);
     buffer = nullptr;
-    socket = -1;
   }
 }
 
-bool SocketAdapter::closed() {
-  lock_guard<mutex> locker(write_mutex);
-  return buffer == nullptr;
-}
+bool SocketAdapter::closed() const { return buffer == nullptr; }
 
 void SocketAdapter::write(const void *data, uint32_t size) {
-  lock_guard<mutex> locker(write_mutex);
   if (buffer == nullptr)
     return;
   if (::write(socket, data, size) < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
-    close_nolock();
+    close();
   }
 }

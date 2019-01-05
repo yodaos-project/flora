@@ -11,7 +11,7 @@ int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra,
                                           uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_REQ);
-  caps->write(version);
+  caps->write((int32_t)version);
   caps->write(extra);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
@@ -48,61 +48,16 @@ int32_t RequestSerializer::serialize_unsubscribe(const char *name, void *data,
   return r;
 }
 
-int32_t RequestSerializer::serialize_declare_method(const char *name,
-                                                    void *data, uint32_t size,
-                                                    uint32_t flags) {
-  shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_DECLARE_METHOD_REQ);
-  caps->write(name);
-  int32_t r = caps->serialize(data, size, flags);
-  if (r < 0)
-    return -1;
-  if (r > size)
-    return -1;
-  return r;
-}
-
-int32_t RequestSerializer::serialize_remove_method(const char *name, void *data,
-                                                   uint32_t size,
-                                                   uint32_t flags) {
-  shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_REMOVE_METHOD_REQ);
-  caps->write(name);
-  int32_t r = caps->serialize(data, size, flags);
-  if (r < 0)
-    return -1;
-  if (r > size)
-    return -1;
-  return r;
-}
-
 int32_t RequestSerializer::serialize_post(const char *name, uint32_t msgtype,
-                                          shared_ptr<Caps> &args, void *data,
-                                          uint32_t size, uint32_t flags) {
-  shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_POST_REQ);
-  caps->write(msgtype);
-  caps->write(name);
-  caps->write(args);
-  int32_t r = caps->serialize(data, size, flags);
-  if (r < 0)
-    return -1;
-  if (r > size)
-    return -1;
-  return r;
-}
-
-int32_t RequestSerializer::serialize_call(const char *name,
-                                          shared_ptr<Caps> &args,
-                                          const char *target, int32_t id,
+                                          shared_ptr<Caps> &args, int32_t id,
                                           uint32_t timeout, void *data,
                                           uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_CALL_REQ);
-  caps->write(name);
-  caps->write(target);
+  caps->write(CMD_POST_REQ);
+  caps->write((int32_t)msgtype);
   caps->write(id);
-  caps->write(timeout);
+  caps->write((int32_t)timeout);
+  caps->write(name);
   caps->write(args);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
@@ -112,13 +67,16 @@ int32_t RequestSerializer::serialize_call(const char *name,
   return r;
 }
 
-int32_t RequestSerializer::serialize_reply(int32_t id, Reply &reply, void *data,
+int32_t RequestSerializer::serialize_reply(const char *name,
+                                           shared_ptr<Caps> &args, int32_t id,
+                                           int32_t retcode, void *data,
                                            uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_REQ);
   caps->write(id);
-  caps->write(reply.ret_code);
-  caps->write(reply.data);
+  caps->write(retcode);
+  caps->write(name);
+  caps->write(args);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -141,27 +99,12 @@ int32_t ResponseSerializer::serialize_auth(int32_t result, void *data,
 }
 
 int32_t ResponseSerializer::serialize_post(const char *name, uint32_t msgtype,
-                                           shared_ptr<Caps> &args, void *data,
-                                           uint32_t size, uint32_t flags) {
-  shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_POST_RESP);
-  caps->write(msgtype);
-  caps->write(name);
-  caps->write(args);
-  int32_t r = caps->serialize(data, size, flags);
-  if (r < 0)
-    return -1;
-  if (r > size)
-    return -1;
-  return r;
-}
-
-int32_t ResponseSerializer::serialize_call(const char *name,
                                            shared_ptr<Caps> &args, int32_t id,
                                            void *data, uint32_t size,
                                            uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
-  caps->write(CMD_CALL_RESP);
+  caps->write(CMD_POST_RESP);
+  caps->write((int32_t)msgtype);
   caps->write(id);
   caps->write(name);
   caps->write(args);
@@ -173,17 +116,19 @@ int32_t ResponseSerializer::serialize_call(const char *name,
   return r;
 }
 
-int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
-                                            Response *reply, void *data,
+int32_t ResponseSerializer::serialize_reply(const char *name, int32_t id,
+                                            ResponseArray &datas, void *data,
                                             uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_RESP);
   caps->write(id);
-  caps->write(rescode);
-  if (rescode == FLORA_CLI_SUCCESS) {
-    caps->write(reply->ret_code);
-    caps->write(reply->data);
-    caps->write(reply->extra.c_str());
+  caps->write(name);
+  caps->write((int32_t)datas.size());
+  size_t i;
+  for (i = 0; i < datas.size(); ++i) {
+    caps->write(datas[i].ret_code);
+    caps->write(datas[i].data);
+    caps->write(datas[i].extra.c_str());
   }
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
@@ -195,73 +140,56 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
 
 int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,
                                   string &extra) {
-  if (caps->read(version) != CAPS_SUCCESS)
+  int32_t v;
+  if (caps->read(v) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(extra) != CAPS_SUCCESS)
+  version = v;
+  if (caps->read_string(extra) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
 int32_t RequestParser::parse_subscribe(shared_ptr<Caps> &caps, string &name) {
-  if (caps->read(name) != CAPS_SUCCESS)
+  if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
 int32_t RequestParser::parse_unsubscribe(shared_ptr<Caps> &caps, string &name) {
-  if (caps->read(name) != CAPS_SUCCESS)
-    return -1;
-  return 0;
-}
-
-int32_t RequestParser::parse_declare_method(shared_ptr<Caps> &caps,
-                                            string &name) {
-  if (caps->read(name) != CAPS_SUCCESS)
-    return -1;
-  return 0;
-}
-
-int32_t RequestParser::parse_remove_method(shared_ptr<Caps> &caps,
-                                           string &name) {
-  if (caps->read(name) != CAPS_SUCCESS)
+  if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
 int32_t RequestParser::parse_post(shared_ptr<Caps> &caps, string &name,
-                                  uint32_t &msgtype, shared_ptr<Caps> &args) {
-  if (caps->read(msgtype) != CAPS_SUCCESS)
-    return -1;
-  if (caps->read(name) != CAPS_SUCCESS)
-    return -1;
-  if (caps->read(args) != CAPS_SUCCESS)
-    return -1;
-  return 0;
-}
-
-int32_t RequestParser::parse_call(shared_ptr<Caps> &caps, string &name,
-                                  shared_ptr<Caps> &args, string &target,
+                                  uint32_t &msgtype, shared_ptr<Caps> &args,
                                   int32_t &id, uint32_t &timeout) {
-  if (caps->read(name) != CAPS_SUCCESS)
+  int32_t v;
+  if (caps->read(v) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(target) != CAPS_SUCCESS)
-    return -1;
+  msgtype = v;
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(timeout) != CAPS_SUCCESS)
+  if (caps->read(v) != CAPS_SUCCESS)
+    return -1;
+  timeout = v;
+  if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   if (caps->read(args) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
-int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
-                                   Reply &reply) {
+int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, string &name,
+                                   shared_ptr<Caps> &args, int32_t &id,
+                                   int32_t &retcode) {
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(reply.ret_code) != CAPS_SUCCESS)
+  if (caps->read(retcode) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(reply.data) != CAPS_SUCCESS)
+  if (caps->read_string(name) != CAPS_SUCCESS)
+    return -1;
+  if (caps->read(args) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
@@ -283,46 +211,45 @@ int32_t ResponseParser::parse_auth(const void *data, uint32_t size,
 }
 
 int32_t ResponseParser::parse_post(shared_ptr<Caps> &caps, string &name,
-                                   uint32_t &msgtype, shared_ptr<Caps> &args) {
-  if (caps->read(msgtype) != CAPS_SUCCESS)
+                                   uint32_t &msgtype, shared_ptr<Caps> &args,
+                                   int32_t &id) {
+  int32_t v;
+  if (caps->read(v) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(name) != CAPS_SUCCESS)
+  msgtype = v;
+  if (caps->read(id) != CAPS_SUCCESS)
+    return -1;
+  if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
   if (caps->read(args) != CAPS_SUCCESS)
     return -1;
   return 0;
 }
 
-int32_t ResponseParser::parse_call(shared_ptr<Caps> &caps, string &name,
-                                   shared_ptr<Caps> &args, int32_t &id) {
-  if (caps->read(id) != CAPS_SUCCESS)
-    return -1;
-  if (caps->read(name) != CAPS_SUCCESS)
-    return -1;
-  if (caps->read(args) != CAPS_SUCCESS)
-    return -1;
-  return 0;
-}
+int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, string &name,
+                                    ResponseArray &replys) {
+  int32_t count;
 
-int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
-                                    int32_t &rescode, Response &reply) {
-  if (caps->read(id) != CAPS_SUCCESS)
+  if (caps->read_string(name) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(rescode) != CAPS_SUCCESS)
+  if (caps->read(count) != CAPS_SUCCESS)
     return -1;
-  if (rescode == FLORA_CLI_SUCCESS) {
-    if (caps->read(reply.ret_code) != CAPS_SUCCESS)
+  replys.reserve(count);
+  while (count) {
+    replys.emplace_back();
+    if (caps->read(replys.back().ret_code) != CAPS_SUCCESS)
       return -1;
-    if (caps->read(reply.data) != CAPS_SUCCESS)
+    if (caps->read(replys.back().data) != CAPS_SUCCESS)
       return -1;
-    if (caps->read(reply.extra) != CAPS_SUCCESS)
+    if (caps->read_string(replys.back().extra) != CAPS_SUCCESS)
       return -1;
+    --count;
   }
   return 0;
 }
 
 bool is_valid_msgtype(uint32_t msgtype) {
-  return msgtype < FLORA_NUMBER_OF_MSGTYPE;
+  return msgtype <= FLORA_MSGTYPE_REQUEST;
 }
 
 } // namespace internal

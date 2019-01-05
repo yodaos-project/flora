@@ -1,6 +1,5 @@
 #pragma once
 
-#include <set>
 #include <stdint.h>
 #include <string>
 
@@ -23,21 +22,7 @@ public:
 
   virtual void close() = 0;
 
-  virtual bool closed() = 0;
-
-  bool declare_method(const std::string &name) {
-    auto r = declared_methods.insert(name);
-    return r.second;
-  }
-
-  void remove_method(const std::string &name) { declared_methods.erase(name); }
-
-  bool has_method(const std::string &name) {
-    return declared_methods.find(name) != declared_methods.end();
-  }
-
-private:
-  std::set<std::string> declared_methods;
+  virtual bool closed() const = 0;
 
 public:
   std::string auth_extra;

@@ -8,49 +8,32 @@ Agent agent;
 agent.config(FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#exam-agent");
 agent.config(FLORA_AGENT_CONFIG_BUFSIZE, 80 * 1024);
 agent.config(FLORA_AGENT_CONFIG_RECONN_INTERVAL, 5000);
-// 订阅消息
-agent.subscribe("foo", [](const char* name, shared_ptr<Caps>& msg, uint32_t type) {
+agent.subscribe("foo", [](const char* name, shared_ptr<Caps>& msg, uint32_t type, Reply* reply) {
 	int32_t iv;
 	string str;
 	msg->read(iv);  // read integer 1
 	msg->read_string(str);  // read string "hello"
+	if (type == FLORA_MSGTYPE_REQUEST) {
+		// fill 'reply' content here
+		// message sender will received the reply content
+		reply->ret_code = 0;
+		reply->data = Caps::new_instance();
+		reply->data->write("world");
+	}
 });
-// 声明远程方法
-agent.declare_method("foo", [](const char* name, shared_ptr<Caps>& msg, Reply& reply) {
-	// fill 'reply' content here
-	// message sender will received the reply content
-	reply->ret_code = 0;
-	reply->data = Caps::new_instance();
-	reply->data->write("world");
-});
-
 agent.start();
-
-// 发送广播消息
 shared_ptr<Caps> msg = Caps::new_instance();
 msg.write(1);
 msg.write("hello");
 agent.post("foo", msg, FLORA_MSGTYPE_INSTANT);
-
-// 远程方法调用
-Response resp;
-// blocking call(msgname, msg, target, response, timeout)
-// NOTE: timeout set to 0 will use default timeout
-int32_t r = agent.call("foo", msg, "exam-agent", resp, 0);
-if (r == FLORA_CLI_SUCCESS) {
+ResponseArray resps;
+agent.get("foo", msg, resps, 0);
+agent.get("foo", msg, [](ResponseArray& resps) {
+	// resps[0].ret_code;  // ret_code will be 0
+	// resps[0].sender;  // sender will be "exam-agent"
 	string str;
-	resp.data->read(str);
-	printf("recv call foo reply: %d, %s\n", res.ret_code, str.c_str());
-}
-// non-blocking call(msgname, msg, target, callback, timeout)
-agent.call("foo", msg, "exam-agent", [](int32_t rescode, Response& resp) {
-	if (rescode == FLORA_CLI_SUCCESS) {
-		// resp.ret_code;  // ret_code will be 0
-		// resp.sender;  // sender will be "exam-agent"
-		string str;
-		resp.data->read_string(str);  // str will be "world"
-	}
-}, 0);
+	resps[0].data->read_string(str);  // str will be "world"
+});
 ```
 
 ## Methods
@@ -89,31 +72,6 @@ cb | [SubscribeCallback](#SubscribeCallback) | | 回调函数
 name | type | default | description
 --- | --- | --- | ---
 name | const char* | | 消息名称
-
----
-
-### declare_method(name, cb)
-
-声明远程调用方法，可接受远程方法调用并返回数据
-
-#### Parameters
-
-name | type | default | description
---- | --- | --- | ---
-name | const char* | | 方法名称
-cb | [DeclareMethodCallback](#DeclareMethodCallback) | | 回调函数
-
----
-
-### remove_method(name)
-
-删除远程调用方法
-
-#### Parameters
-
-name | type | default | description
---- | --- | --- | ---
-name | const char* | | 方法名称
 
 ---
 
@@ -159,19 +117,18 @@ FLORA_CLI_ECONN | flora service连接错误
 
 ---
 
-### call(name, msg, target, response, timeout)
+### get(name, msg, responses, timeout)
 
-向另一客户端发起远程方法调用，等待返回结果。
+发送消息并等待另一客户端回复消息
 
 #### Parameters
 
 name | type | default | description
 --- | --- | --- | ---
-name | const char* | | 远程方法名称
-msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | | 方法参数
-target | const char* | | 声明远程方法的客户端id
-response | [Response](#Response) | | 远程方法的返回
-timeout | uint32_t | 0 | 等待回复的超时时间，0表示使用默认超时时间。
+name | const char* | | 消息名称
+msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | | 消息内容
+responses | vector<[Response](#Response)>& | | 收到的回复消息
+timeout | uint32_t | 0 | 等待回复的超时时间，0表示无超时。
 
 #### returns
 
@@ -182,12 +139,11 @@ value | description
 FLORA_CLI_SUCCESS | 成功
 FLORA_CLI_EINVAL | 参数非法
 FLORA_CLI_ECONN | flora service连接错误
-FLORA_CLI_ENEXISTS | 找不到此远程调用方法
 FLORA_CLI_ETIMEOUT | 超时无回复
 
 ---
 
-### call(name, msg, target, cb, timeout)
+### get(name, msg, cb)
 
 发送消息并等待另一客户端回复消息
 
@@ -195,11 +151,9 @@ FLORA_CLI_ETIMEOUT | 超时无回复
 
 name | type | default | description
 --- | --- | --- | ---
-name | const char* | | 远程方法名称
-msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | | 方法参数
-target | const char* | | 声明远程方法的客户端id
-cb | [CallCallback](#CallCallback) | | 回调函数
-timeout | uint32_t | 0 | 等待回复的超时时间，0表示使用默认超时时间。
+name | const char* | | 消息名称
+msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | | 消息内容
+cb | [GetCallback](#GetCallback) | | 回调函数
 
 #### returns
 
@@ -215,7 +169,7 @@ FLORA_CLI_ECONN | flora service连接错误
 
 ## Definition
 
-### <a id="SubscribeCallback"></a>SubscribeCallback(name, msg, type)
+### <a id="SubscribeCallback"></a>SubscribeCallback(name, msg, type, reply)
 
 回调函数：收到订阅的消息
 
@@ -225,21 +179,10 @@ name | type | description
 --- | --- | ---
 name | string | 消息名称
 msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST
+type | uint32_t | 消息类型<br>FLORA_MSGTYPE_INSTANT<br>FLORA_MSGTYPE_PERSIST<br>FLORA_MSGTYPE_REQUEST
+reply | [Reply](#Reply)\* | 当type == FLORA_MSGTYPE_REQUEST时，填充reply指向的结构体，给消息发送者回复数据
 
-### <a id="DeclareMethodCallback"></a>DeclareMethodCallback(name, msg, reply)
-
-回调函数：收到远程方法调用
-
-#### Parameters
-
-name | type | description
---- | --- | ---
-name | string | 消息名称
-msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-reply | [Reply](#Reply)& | 填充reply结构体，给远程方法调用者返回数据
-
-### <a id="CallCallback"></a>CallCallback(int32_t, response)
+### <a id="GetCallback"></a>GetCallback(responses)
 
 回调函数：收到回复的消息
 
@@ -247,8 +190,7 @@ reply | [Reply](#Reply)& | 填充reply结构体，给远程方法调用者返回
 
 name | type | description
 --- | --- | ---
-rescode | int32_t | 远程方法调用错误码
-response | [Response](#Response)& | 远程调用返回结果
+responses | vector\<[Response](#Response)>& | 回复的消息数组<br>'get'请求的每个订阅者回复一个消息内容，所以数组的长度等于消息的订阅者数量。
 
 ### <a id="Reply"></a>Reply
 
@@ -265,6 +207,6 @@ data | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.
 
 name | type | description
 --- | --- | ---
-ret_code | int32_t | 返回码，远程方法返回，0为成功。
+ret_code | int32_t | 返回码，由消息订阅者设置，0为成功。
 data | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-sender | string | 远程方法声明方的身份标识
+sender | string | 消息订阅者的身份标识，可选项。
