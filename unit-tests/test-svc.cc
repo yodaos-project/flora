@@ -18,6 +18,7 @@ bool TestService::run(const char *uri, bool capi) {
       c_dispatcher = 0;
       return false;
     }
+    flora_dispatcher_run(c_dispatcher, 0);
   } else {
     dispatcher = Dispatcher::new_instance(0);
     fpoll = Poll::new_instance(uri);
@@ -25,6 +26,7 @@ bool TestService::run(const char *uri, bool capi) {
       return false;
     if (fpoll->start(dispatcher) != FLORA_POLL_SUCCESS)
       return false;
+    dispatcher->run(false);
   }
   return true;
 }
