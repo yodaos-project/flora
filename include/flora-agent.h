@@ -27,15 +27,13 @@
 
 namespace flora {
 
-typedef std::map<
-    std::string,
-    std::function<void(const char *, std::shared_ptr<Caps> &, uint32_t)>>
-    PostHandlerMap;
-
-typedef std::map<
-    std::string,
-    std::function<void(const char *, std::shared_ptr<Caps> &, Reply &)>>
-    CallHandlerMap;
+typedef std::function<void(const char *, std::shared_ptr<Caps> &, uint32_t)>
+    PostHandler;
+typedef std::function<void(const char *, std::shared_ptr<Caps> &,
+                           std::shared_ptr<Reply> &)>
+    CallHandler;
+typedef std::map<std::string, PostHandler> PostHandlerMap;
+typedef std::map<std::string, CallHandler> CallHandlerMap;
 
 class Agent : public ClientCallback {
 public:
@@ -45,25 +43,15 @@ public:
 
   void config(uint32_t key, va_list ap);
 
-  void subscribe(const char *name,
-                 std::function<void(const char *, std::shared_ptr<Caps> &,
-                                    uint32_t)> &&cb);
+  void subscribe(const char *name, PostHandler &&cb);
 
-  void subscribe(
-      const char *name,
-      std::function<void(const char *, std::shared_ptr<Caps> &, uint32_t)> &cb);
+  void subscribe(const char *name, PostHandler &cb);
 
   void unsubscribe(const char *name);
 
-  void declare_method(
-      const char *name,
-      std::function<void(const char *name, std::shared_ptr<Caps> &, Reply &)>
-          &&cb);
+  void declare_method(const char *name, CallHandler &&cb);
 
-  void declare_method(
-      const char *name,
-      std::function<void(const char *name, std::shared_ptr<Caps> &, Reply &)>
-          &cb);
+  void declare_method(const char *name, CallHandler &cb);
 
   void remove_method(const char *name);
 
@@ -87,7 +75,8 @@ public:
   void recv_post(const char *name, uint32_t msgtype,
                  std::shared_ptr<Caps> &msg);
 
-  void recv_call(const char *name, std::shared_ptr<Caps> &msg, Reply &reply);
+  void recv_call(const char *name, std::shared_ptr<Caps> &msg,
+                 std::shared_ptr<Reply> &reply);
 
   void disconnected();
 
@@ -119,15 +108,11 @@ extern "C" {
 #endif // __cplusplus
 
 typedef intptr_t flora_agent_t;
-typedef struct {
-  int32_t ret_code;
-  caps_t data;
-} flora_reply_t;
 typedef void (*flora_agent_subscribe_callback_t)(const char *name, caps_t msg,
                                                  uint32_t type, void *arg);
 typedef void (*flora_agent_declare_method_callback_t)(const char *name,
                                                       caps_t msg,
-                                                      flora_reply_t *reply,
+                                                      flora_call_reply_t reply,
                                                       void *arg);
 
 flora_agent_t flora_agent_create();

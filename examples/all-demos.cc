@@ -13,6 +13,7 @@ void DemoAllInOne::run() {
   run_post_msg();
   run_recv_msg();
   test_errors();
+  test_reply_after_close();
 }
 
 void DemoAllInOne::start_service() {
@@ -162,22 +163,27 @@ static void exam_subscribe_callback(const char *name, caps_t msg, uint32_t type,
 }
 
 static void exam_declare_method_callback(const char *name, caps_t msg,
-                                         flora_reply_t *reply, void *arg) {
+                                         flora_call_reply_t reply, void *arg) {
   int32_t iv = -1;
+  caps_t data;
   switch ((intptr_t)arg) {
   case 2:
     caps_read_integer(msg, &iv);
     KLOGI(TAG, "2: recv call %s, content %d", name, iv);
-    reply->ret_code = FLORA_CLI_SUCCESS;
-    reply->data = caps_create();
-    caps_write_integer(reply->data, 2);
+    data = caps_create();
+    caps_write_integer(data, 2);
+    flora_call_reply_write_data(reply, data);
+    flora_call_reply_end(reply);
+    caps_destroy(data);
     break;
   case 3:
     caps_read_integer(msg, &iv);
     KLOGI(TAG, "3: recv call %s, content %d", name, iv);
-    reply->ret_code = FLORA_CLI_SUCCESS;
-    reply->data = caps_create();
-    caps_write_integer(reply->data, 3);
+    data = caps_create();
+    caps_write_integer(data, 3);
+    flora_call_reply_write_data(reply, data);
+    flora_call_reply_end(reply);
+    caps_destroy(data);
     break;
   }
 }
@@ -199,24 +205,26 @@ static void agent_subscribe(Agent &agent, flora_agent_t cagent) {
 }
 
 static void agent_declare_methods(Agent &agent, flora_agent_t cagent) {
-  agent.declare_method(
-      "2", [](const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-        int32_t iv = -1;
-        msg->read(iv);
-        KLOGI(TAG, "recv call %s, content %d", name, iv);
-        reply.ret_code = FLORA_CLI_SUCCESS;
-        reply.data = Caps::new_instance();
-        reply.data->write(2);
-      });
-  agent.declare_method(
-      "3", [](const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-        int32_t iv = -1;
-        msg->read(iv);
-        KLOGI(TAG, "recv call %s, content %d", name, iv);
-        reply.ret_code = FLORA_CLI_SUCCESS;
-        reply.data = Caps::new_instance();
-        reply.data->write(3);
-      });
+  agent.declare_method("2", [](const char *name, shared_ptr<Caps> &msg,
+                               shared_ptr<Reply> &reply) {
+    int32_t iv = -1;
+    msg->read(iv);
+    KLOGI(TAG, "recv call %s, content %d", name, iv);
+    shared_ptr<Caps> data = Caps::new_instance();
+    data->write(2);
+    reply->write_data(data);
+    reply->end();
+  });
+  agent.declare_method("3", [](const char *name, shared_ptr<Caps> &msg,
+                               shared_ptr<Reply> &reply) {
+    int32_t iv = -1;
+    msg->read(iv);
+    KLOGI(TAG, "recv call %s, content %d", name, iv);
+    shared_ptr<Caps> data = Caps::new_instance();
+    data->write(3);
+    reply->write_data(data);
+    reply->end();
+  });
 
   flora_agent_declare_method(cagent, "2", exam_declare_method_callback,
                              (void *)2);
@@ -270,14 +278,14 @@ void DemoAllInOne::test_errors() {
       0);
   KLOGI(TAG, "call method return %d, except %d", r, FLORA_CLI_SUCCESS);
 
-  agents[1].declare_method(
-      "foo", [](const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-        KLOGI(TAG, "method %s invoked: sleep 1 second", name);
-        sleep(1);
-        reply.ret_code = 0;
-      });
+  agents[1].declare_method("foo", [](const char *name, shared_ptr<Caps> &msg,
+                                     shared_ptr<Reply> &reply) {
+    KLOGI(TAG, "method %s invoked: sleep 1 second", name);
+    sleep(1);
+    reply->end();
+  });
   // wait declare method finish
-  usleep(200);
+  usleep(200000);
   r = agents[0].call("foo", msg, "b", resp, 1500);
   KLOGI(TAG, "call method foo: rescode %d, except %d", r, FLORA_CLI_SUCCESS);
   agents[0].call("foo", msg, "b",
@@ -288,6 +296,69 @@ void DemoAllInOne::test_errors() {
                  1);
   r = agents[0].call("foo", msg, "b", resp, 0);
   KLOGI(TAG, "call method foo: rescode %d, except %d", r, FLORA_CLI_ETIMEOUT);
+
+  sleep(1);
+  stop_service();
+}
+
+void DemoAllInOne::test_reply_after_close() {
+  KLOGI(TAG, "============test reply after close============");
+  start_service();
+
+  const char *targetName = "reply-after-close";
+  Agent agent;
+  char buf[64];
+  shared_ptr<Reply> outreply;
+  snprintf(buf, sizeof(buf), "%s#%s", SERVICE_URI, targetName);
+  agent.config(FLORA_AGENT_CONFIG_URI, buf);
+  agent.declare_method("foo",
+                       [&outreply](const char *name, shared_ptr<Caps> &args,
+                                   shared_ptr<Reply> &reply) {
+                         KLOGI(TAG, "remote method %s invoked", name);
+                         outreply = reply;
+                       });
+  agent.start();
+  // wait declare method finish
+  usleep(200000);
+
+  Response resp;
+  shared_ptr<Caps> empty_arg;
+  int32_t r = agent.call("foo", empty_arg, targetName, resp, 100);
+  if (r != FLORA_CLI_ETIMEOUT) {
+    KLOGE(TAG, "agent call should timeout, but %d", r);
+    return;
+  }
+
+  r = agent.call("foo", empty_arg, targetName,
+                 [](int32_t code, Response &resp) {
+                   KLOGI(TAG, "remote method foo return: %d, %d", code,
+                         resp.ret_code);
+                 },
+                 1000);
+  if (r != FLORA_CLI_SUCCESS) {
+    KLOGE(TAG, "agent call failed: %d", r);
+    return;
+  }
+  usleep(200000);
+  outreply.reset();
+
+  Agent otherAgent;
+  otherAgent.config(FLORA_AGENT_CONFIG_URI, SERVICE_URI);
+  otherAgent.start();
+  usleep(200000);
+  r = otherAgent.call("foo", empty_arg, targetName,
+                      [](int32_t code, Response &resp) {
+                        KLOGI(TAG, "remote method foo return: %d, %d", code,
+                              resp.ret_code);
+                      },
+                      500);
+  if (r != FLORA_CLI_SUCCESS) {
+    KLOGE(TAG, "agent call failed: %d", r);
+    return;
+  }
+  usleep(200000);
+  agent.close();
+  outreply.reset();
 
   sleep(1);
   stop_service();

@@ -1,7 +1,9 @@
 #include "sock-conn.h"
 #include "rlog.h"
 #include <arpa/inet.h>
+#include <chrono>
 #include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -9,7 +11,17 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+using namespace std;
+
 #define TAG "flora.SocketConn"
+
+int SocketConn::nullfd = open("/dev/null", O_RDONLY);
+
+SocketConn::~SocketConn() {
+  if (sock >= 0) {
+    ::close(sock);
+  }
+}
 
 bool SocketConn::connect(const std::string &name) {
   int fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -27,6 +39,7 @@ bool SocketConn::connect(const std::string &name) {
     return false;
   }
   sock = fd;
+  sock_ready = true;
   return true;
 }
 
@@ -54,11 +67,13 @@ bool SocketConn::connect(const std::string &host, int32_t port) {
     return false;
   }
   sock = fd;
+  sock_ready = true;
   return true;
 }
 
 bool SocketConn::send(const void *data, uint32_t size) {
-  if (sock < 0)
+  lock_guard<mutex> locker(write_mutex);
+  if (!sock_ready)
     return false;
   ssize_t c = ::write(sock, data, size);
   if (c < 0) {
@@ -73,8 +88,11 @@ bool SocketConn::send(const void *data, uint32_t size) {
 }
 
 int32_t SocketConn::recv(void *data, uint32_t size) {
-  if (sock < 0)
+  unique_lock<mutex> locker(write_mutex);
+  if (!sock_ready)
     return -1;
+  locker.unlock();
+
   ssize_t c;
   do {
     c = ::read(sock, data, size);
@@ -93,9 +111,9 @@ int32_t SocketConn::recv(void *data, uint32_t size) {
 }
 
 void SocketConn::close() {
-  if (sock < 0)
-    return;
-  ::shutdown(sock, SHUT_RDWR);
-  ::close(sock);
-  sock = -1;
+  lock_guard<mutex> locker(write_mutex);
+  if (sock_ready) {
+    sock_ready = false;
+    dup2(nullfd, sock);
+  }
 }

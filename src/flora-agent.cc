@@ -1,4 +1,5 @@
 #include "flora-agent.h"
+#include "cli.h"
 #include "rlog.h"
 #include <string.h>
 #include <thread>
@@ -33,15 +34,11 @@ void Agent::config(uint32_t key, va_list ap) {
   }
 }
 
-void Agent::subscribe(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, uint32_t)> &&cb) {
+void Agent::subscribe(const char *name, PostHandler &&cb) {
   subscribe(name, cb);
 }
 
-void Agent::subscribe(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, uint32_t)> &cb) {
+void Agent::subscribe(const char *name, PostHandler &cb) {
   shared_ptr<Client> cli;
   conn_mutex.lock();
   auto r = post_handlers.insert(make_pair(name, cb));
@@ -66,15 +63,11 @@ void Agent::unsubscribe(const char *name) {
     cli->unsubscribe(name);
 }
 
-void Agent::declare_method(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, Reply &)> &&cb) {
+void Agent::declare_method(const char *name, CallHandler &&cb) {
   declare_method(name, cb);
 }
 
-void Agent::declare_method(
-    const char *name,
-    function<void(const char *name, shared_ptr<Caps> &, Reply &)> &cb) {
+void Agent::declare_method(const char *name, CallHandler &cb) {
   shared_ptr<Client> cli;
   conn_mutex.lock();
   auto r = call_handlers.insert(make_pair(name, cb));
@@ -239,7 +232,8 @@ void Agent::recv_post(const char *name, uint32_t msgtype,
   }
 }
 
-void Agent::recv_call(const char *name, shared_ptr<Caps> &msg, Reply &reply) {
+void Agent::recv_call(const char *name, shared_ptr<Caps> &msg,
+                      shared_ptr<Reply> &reply) {
   unique_lock<mutex> locker(conn_mutex);
   CallHandlerMap::iterator it = call_handlers.find(name);
   if (it != call_handlers.end()) {
@@ -290,19 +284,14 @@ void flora_agent_declare_method(flora_agent_t agent, const char *name,
                                 flora_agent_declare_method_callback_t cb,
                                 void *arg) {
   Agent *cxxagent = reinterpret_cast<Agent *>(agent);
-  cxxagent->declare_method(
-      name, [cb, arg](const char *name, shared_ptr<Caps> &msg, Reply &reply) {
-        caps_t cmsg = Caps::convert(msg);
-        flora_reply_t creply;
-        memset(&creply, 0, sizeof(creply));
-        cb(name, cmsg, &creply, arg);
-        reply.ret_code = creply.ret_code;
-        if (creply.data) {
-          reply.data = Caps::convert(creply.data);
-          caps_destroy(creply.data);
-        }
-        caps_destroy(cmsg);
-      });
+  cxxagent->declare_method(name, [cb, arg](const char *name,
+                                           shared_ptr<Caps> &msg,
+                                           shared_ptr<Reply> &reply) {
+    caps_t cmsg = Caps::convert(msg);
+    CReply *creply = new CReply();
+    creply->cxxreply = reply;
+    cb(name, cmsg, reinterpret_cast<intptr_t>(creply), arg);
+  });
 }
 
 void flora_agent_start(flora_agent_t agent, int32_t block) {
