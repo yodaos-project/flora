@@ -13,12 +13,14 @@ static void foo_sub_callback(const char* name, caps_t msg, uint32_t type, void* 
 	caps_read_integer(msg, &iv);  // read integer 1
 	caps_read_string(msg, &str);  // read string "hello"
 }
-static void foo_method_callback(const char* name, caps_t msg, flora_reply_t* reply, void* arg) {
-	// fill 'reply' content here
-	// message sender will received the reply content
-	reply->ret_code = 0;
-	reply->data = caps_create();
-	caps_write_string(reply->data, "world");
+static void foo_method_callback(const char* name, caps_t msg, flora_call_reply_t reply, void* arg) {
+	// use 'flora_call_reply_end(reply)' to send return values to caller
+  caps_t data = caps_create();
+  caps_write_string(data, "world");
+  flora_call_reply_write_code(reply, FLORA_CLI_SUCCESS);
+  flora_call_reply_write_data(reply, data);
+  flora_call_reply_end(reply);
+  caps_destroy(data);
 }
 
 // 最后参数(void*)1 为可选项，将传入foo_sub_callback
@@ -228,6 +230,44 @@ FLORA_CLI_ECONN | flora service连接错误
 
 ---
 
+### <a id="Reply"></a>flora_call_reply_write_code
+
+设置远程函数返回码
+
+#### Parameters
+
+name | type | default | description
+--- | --- | --- | ---
+reply | flora_call_reply_t | | 详见[flora\_agent\_declare\_method\_callback\_t](#DeclareMethodCallback)
+code | int32_t | 0 |
+
+---
+
+### flora_call_reply_write_data
+
+设置远程函数返回值
+
+#### Parameters
+
+name | type | default | description
+--- | --- | --- | ---
+reply | flora_call_reply_t | | 详见[flora\_agent\_declare\_method\_callback\_t](#DeclareMethodCallback)
+data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 消息内容
+
+---
+
+### flora_call_reply_end
+
+销毁flora_call_reply_t对象并将返回码与返回值发送至flora服务，flora服务将发送给远程函数调用者
+
+#### Parameters
+
+name | type | default | description
+--- | --- | --- | ---
+reply | flora_call_reply_t | | 详见[flora\_agent\_declare\_method\_callback\_t](#DeclareMethodCallback)
+
+---
+
 ## Definition
 
 ### <a id="SubscribeCallback"></a>flora\_agent\_subscribe\_callback\_t(name, msg, type, arg)
@@ -253,7 +293,7 @@ name | type | description
 --- | --- | ---
 name | string | 远程方法名称
 msg | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | | 方法参数
-reply | [flora\_reply\_t](#Reply)\* | 填充reply指向的结构体，给远程方法调用者返回数据
+reply | [flora\_call_reply\_t](#Reply) | reply对象，通过flora_call_reply_\*系列函数给远程方法调用者返回数据
 arg | void* | declare_method传入的参数arg
 
 ### <a id="CallCallback"></a>flora_call\_callback\_t(rescode, result, arg)
@@ -267,15 +307,6 @@ name | type | description
 rescode | int32_t | 远程方法调用错误码
 result | [flora\_result\_t](#Result)* | 远程方法调用返回值
 arg | void* | call_nb传入的参数arg
-
-### <a id="Reply"></a>flora\_reply\_t
-
-#### Members
-
-name | type | description
---- | --- | ---
-ret_code | int32_t | 返回码，0为成功。
-data | [caps_t](https://github.com/Rokid/aife-mutils/blob/master/caps.md) | 返回数据
 
 ### <a id="Response"></a>flora\_result\_t
 
