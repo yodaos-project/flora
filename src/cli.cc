@@ -467,6 +467,17 @@ void ReplyImpl::end() {
   }
 }
 
+void ReplyImpl::end(int32_t code) {
+  write_code(code);
+  end();
+}
+
+void ReplyImpl::end(int32_t code, std::shared_ptr<Caps> &data) {
+  write_code(code);
+  write_data(data);
+  end();
+}
+
 } // namespace internal
 } // namespace flora
 

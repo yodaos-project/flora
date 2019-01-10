@@ -106,6 +106,10 @@ public:
 
   void end();
 
+  void end(int32_t code);
+
+  void end(int32_t code, std::shared_ptr<Caps> &data);
+
 private:
   std::shared_ptr<Client> client;
   int32_t ret_code = FLORA_CLI_SUCCESS;

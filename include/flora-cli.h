@@ -49,6 +49,10 @@ public:
   virtual void write_data(std::shared_ptr<Caps> &data) = 0;
 
   virtual void end() = 0;
+
+  virtual void end(int32_t code) = 0;
+
+  virtual void end(int32_t code, std::shared_ptr<Caps> &data) = 0;
 };
 
 class ClientCallback;
