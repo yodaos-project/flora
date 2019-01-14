@@ -24,6 +24,4 @@ private:
   int sock = -1;
   bool sock_ready = false;
   std::mutex write_mutex;
-
-  static int nullfd;
 };

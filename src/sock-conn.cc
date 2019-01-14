@@ -15,8 +15,6 @@ using namespace std;
 
 #define TAG "flora.SocketConn"
 
-int SocketConn::nullfd = open("/dev/null", O_RDONLY);
-
 SocketConn::~SocketConn() {
   if (sock >= 0) {
     ::close(sock);
@@ -114,6 +112,6 @@ void SocketConn::close() {
   lock_guard<mutex> locker(write_mutex);
   if (sock_ready) {
     sock_ready = false;
-    dup2(nullfd, sock);
+    ::shutdown(sock, SHUT_RDWR);
   }
 }
