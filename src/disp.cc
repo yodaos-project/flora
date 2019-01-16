@@ -366,9 +366,10 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
                                   shared_ptr<Adapter> &sender) {
   shared_ptr<Caps> args;
   int32_t svrid;
-  Reply reply;
+  int32_t ret_code;
+  shared_ptr<Caps> data;
 
-  if (RequestParser::parse_reply(msg_caps, svrid, reply) != 0)
+  if (RequestParser::parse_reply(msg_caps, svrid, ret_code, data) != 0)
     return false;
   KLOGI(TAG, "<<< %s: reply %d", sender->auth_extra.c_str(), svrid);
   PendingCallList::iterator it;
@@ -380,11 +381,11 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
   if (it == pending_calls.end()) {
     KLOGW(TAG, "<<< %s: reply %d failed. not found pending call",
           sender->auth_extra.c_str(), svrid);
-    return false;
+    return true;
   }
   Response resp;
-  resp.ret_code = reply.ret_code;
-  resp.data = reply.data;
+  resp.ret_code = ret_code;
+  resp.data = data;
   resp.extra = sender->auth_extra;
   int32_t c = ResponseSerializer::serialize_reply(
       (*it).cliid, FLORA_CLI_SUCCESS, &resp, buffer, buf_size,

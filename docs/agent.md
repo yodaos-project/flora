@@ -16,12 +16,13 @@ agent.subscribe("foo", [](const char* name, shared_ptr<Caps>& msg, uint32_t type
 	msg->read_string(str);  // read string "hello"
 });
 // 声明远程方法
-agent.declare_method("foo", [](const char* name, shared_ptr<Caps>& msg, Reply& reply) {
-	// fill 'reply' content here
-	// message sender will received the reply content
-	reply->ret_code = 0;
-	reply->data = Caps::new_instance();
-	reply->data->write("world");
+agent.declare_method("foo", [](const char* name, shared_ptr<Caps>& msg, shared_ptr<Reply>& reply) {
+	// use 'reply->end()' to send return values to caller
+  reply->write_code(FLORA_CLI_SUCCESS);
+  shared_ptr<Caps> data = Caps::new_instance();
+	data->write("world");
+  reply->write_data(data);
+  reply->end();
 });
 
 agent.start();
@@ -48,7 +49,7 @@ agent.call("foo", msg, "exam-agent", [](int32_t rescode, Response& resp) {
 		// resp.ret_code;  // ret_code will be 0
 		// resp.sender;  // sender will be "exam-agent"
 		string str;
-		resp.data->read_string(str);  // str will be "world"
+		resp.data->read(str);  // str will be "world"
 	}
 }, 0);
 ```
@@ -237,7 +238,7 @@ name | type | description
 --- | --- | ---
 name | string | 消息名称
 msg | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
-reply | [Reply](#Reply)& | 填充reply结构体，给远程方法调用者返回数据
+reply | shared_ptr\<[Reply](reply.md)\>& | reply对象，给远程方法调用者返回数据
 
 ### <a id="CallCallback"></a>CallCallback(int32_t, response)
 
@@ -249,15 +250,6 @@ name | type | description
 --- | --- | ---
 rescode | int32_t | 远程方法调用错误码
 response | [Response](#Response)& | 远程调用返回结果
-
-### <a id="Reply"></a>Reply
-
-#### Members
-
-name | type | description
---- | --- | ---
-ret_code | int32_t | 返回码，0为成功。
-data | shared_ptr\<[Caps](https://github.com/Rokid/aife-mutils/blob/master/caps.md)>& | 消息内容
 
 ### <a id="Response"></a>Response
 

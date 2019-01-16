@@ -11,4 +11,6 @@ public:
   virtual int32_t recv(void *data, uint32_t size) = 0;
 
   virtual void close() = 0;
+
+  virtual bool closed() const = 0;
 };

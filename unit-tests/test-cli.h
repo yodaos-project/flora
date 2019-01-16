@@ -30,12 +30,13 @@ public:
 
   void recv_post(const char *name, uint32_t msgtype, shared_ptr<Caps> &msg);
 
-  void recv_call(const char *name, shared_ptr<Caps> &msg, Reply &reply);
+  void recv_call(const char *name, shared_ptr<Caps> &msg,
+                 shared_ptr<Reply> &reply);
 
 private:
   void c_recv_post(const char *name, uint32_t msgtype, caps_t args);
 
-  void c_recv_call(const char *name, caps_t args, flora_call_reply *reply);
+  void c_recv_call(const char *name, caps_t args, flora_call_reply_t reply);
 
 public:
   static void static_init(bool capi);
@@ -49,7 +50,7 @@ private:
                           void *arg);
 
   static void recv_call_s(const char *name, caps_t msg, void *arg,
-                          flora_call_reply *reply);
+                          flora_call_reply_t reply);
 
 public:
   int8_t subscribe_flags[FLORA_MSG_COUNT];

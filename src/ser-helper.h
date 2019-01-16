@@ -34,7 +34,8 @@ public:
                                 uint32_t timeout, void *data, uint32_t size,
                                 uint32_t flags);
 
-  static int32_t serialize_reply(int32_t id, Reply &reply, void *data,
+  static int32_t serialize_reply(int32_t id, int32_t code,
+                                 std::shared_ptr<Caps> &values, void *data,
                                  uint32_t size, uint32_t flags);
 };
 
@@ -80,7 +81,7 @@ public:
                             int32_t &id, uint32_t &timeout);
 
   static int32_t parse_reply(std::shared_ptr<Caps> &caps, int32_t &id,
-                             Reply &reply);
+                             int32_t &code, std::shared_ptr<Caps> &values);
 };
 
 class ResponseParser {

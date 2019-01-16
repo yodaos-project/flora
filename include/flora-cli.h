@@ -39,12 +39,20 @@ typedef struct {
   std::string extra;
 } Response;
 
-typedef std::vector<Response> ResponseArray;
-
+// NOTE: the Reply class methods not threadsafe
 class Reply {
 public:
-  int32_t ret_code = FLORA_CLI_SUCCESS;
-  std::shared_ptr<Caps> data;
+  virtual ~Reply() = default;
+
+  virtual void write_code(int32_t code) = 0;
+
+  virtual void write_data(std::shared_ptr<Caps> &data) = 0;
+
+  virtual void end() = 0;
+
+  virtual void end(int32_t code) = 0;
+
+  virtual void end(int32_t code, std::shared_ptr<Caps> &data) = 0;
 };
 
 class ClientCallback;
@@ -91,7 +99,7 @@ public:
                          std::shared_ptr<Caps> &msg) {}
 
   virtual void recv_call(const char *name, std::shared_ptr<Caps> &msg,
-                         Reply &reply) {}
+                         std::shared_ptr<Reply> &reply) {}
 
   virtual void disconnected() {}
 };
@@ -107,14 +115,12 @@ typedef void (*flora_cli_disconnected_func_t)(void *arg);
 // 'msg': 注意，必须在函数未返回时读取msg，函数返回后读取msg非法
 typedef void (*flora_cli_recv_post_func_t)(const char *name, uint32_t msgtype,
                                            caps_t msg, void *arg);
-typedef struct {
-  int32_t ret_code;
-  caps_t data;
-} flora_call_reply;
+typedef intptr_t flora_call_reply_t;
+
 // 'call'请求的接收端
 // 在此函数中填充'reply'变量，客户端将把'reply'数据发回给'call'请求发送端
 typedef void (*flora_cli_recv_call_func_t)(const char *name, caps_t msg,
-                                           void *arg, flora_call_reply *reply);
+                                           void *arg, flora_call_reply_t reply);
 typedef struct {
   flora_cli_recv_post_func_t recv_post;
   flora_cli_recv_call_func_t recv_call;
@@ -165,6 +171,12 @@ int32_t flora_cli_call_nb(flora_cli_t handle, const char *name, caps_t msg,
                           void *arg, uint32_t timeout);
 
 void flora_result_delete(flora_call_result *result);
+
+void flora_call_reply_write_code(flora_call_reply_t reply, int32_t code);
+
+void flora_call_reply_write_data(flora_call_reply_t reply, caps_t data);
+
+void flora_call_reply_end(flora_call_reply_t reply);
 
 #ifdef __cplusplus
 } // namespace flora

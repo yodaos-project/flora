@@ -23,6 +23,8 @@ private:
 
   void test_errors();
 
+  void test_reply_after_close();
+
 private:
   std::shared_ptr<flora::Poll> poll;
   std::shared_ptr<flora::Dispatcher> dispatcher;

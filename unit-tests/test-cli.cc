@@ -18,7 +18,7 @@ void TestClient::recv_post_s(const char *name, uint32_t msgtype, caps_t msg,
 }
 
 void TestClient::recv_call_s(const char *name, caps_t msg, void *arg,
-                             flora_call_reply *reply) {
+                             flora_call_reply_t reply) {
   TestClient *tc = reinterpret_cast<TestClient *>(arg);
   tc->c_recv_call(name, msg, reply);
 }
@@ -192,7 +192,7 @@ void TestClient::recv_post(const char *name, uint32_t msgtype,
 }
 
 void TestClient::recv_call(const char *name, shared_ptr<Caps> &args,
-                           Reply &reply) {
+                           shared_ptr<Reply> &reply) {
   int32_t i;
   int32_t v;
 
@@ -210,8 +210,8 @@ void TestClient::recv_call(const char *name, shared_ptr<Caps> &args,
       break;
     }
   }
-  reply.ret_code = 0;
-  reply.data = args;
+  reply->write_data(args);
+  reply->end();
 }
 
 void TestClient::c_recv_post(const char *name, uint32_t msgtype, caps_t args) {
@@ -235,7 +235,7 @@ void TestClient::c_recv_post(const char *name, uint32_t msgtype, caps_t args) {
 }
 
 void TestClient::c_recv_call(const char *name, caps_t args,
-                             flora_call_reply *reply) {
+                             flora_call_reply_t reply) {
   int32_t i;
   int32_t v;
 
@@ -253,7 +253,8 @@ void TestClient::c_recv_call(const char *name, caps_t args,
       break;
     }
   }
-  reply->ret_code = 0;
-  reply->data = caps_create();
-  caps_write_integer(reply->data, v);
+  caps_t data = caps_create();
+  caps_write_integer(data, v);
+  flora_call_reply_write_data(reply, data);
+  flora_call_reply_end(reply);
 }

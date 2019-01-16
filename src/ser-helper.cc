@@ -112,13 +112,14 @@ int32_t RequestSerializer::serialize_call(const char *name,
   return r;
 }
 
-int32_t RequestSerializer::serialize_reply(int32_t id, Reply &reply, void *data,
+int32_t RequestSerializer::serialize_reply(int32_t id, int32_t code,
+                                           shared_ptr<Caps> &values, void *data,
                                            uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_REQ);
   caps->write(id);
-  caps->write(reply.ret_code);
-  caps->write(reply.data);
+  caps->write(code);
+  caps->write(values);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -256,12 +257,12 @@ int32_t RequestParser::parse_call(shared_ptr<Caps> &caps, string &name,
 }
 
 int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
-                                   Reply &reply) {
+                                   int32_t &code, shared_ptr<Caps> &values) {
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(reply.ret_code) != CAPS_SUCCESS)
+  if (caps->read(code) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(reply.data) != CAPS_SUCCESS)
+  if (caps->read(values) != CAPS_SUCCESS)
     return -1;
   return 0;
 }

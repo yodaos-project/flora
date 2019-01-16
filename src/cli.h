@@ -33,6 +33,10 @@ public:
 
   void close(bool passive);
 
+  void set_weak_ptr(std::shared_ptr<Client> &ptr) { this_weak_ptr = ptr; }
+
+  void send_reply(int32_t callid, int32_t code, std::shared_ptr<Caps> &data);
+
   // implementation of flora::Client
   int32_t subscribe(const char *name);
 
@@ -69,13 +73,13 @@ private:
   uint32_t rbuf_off = 0;
   std::shared_ptr<Connection> connection;
   std::thread recv_thread;
-  std::mutex cli_mutex;
   std::mutex req_mutex;
   std::condition_variable req_reply_cond;
   PendingRequestList pending_requests;
   int32_t reqseq = 0;
   uint32_t serialize_flags = 0;
   int32_t close_reason = 0;
+  std::weak_ptr<Client> this_weak_ptr;
 
 public:
   std::string auth_extra;
@@ -90,5 +94,32 @@ public:
 #endif
 };
 
+class ReplyImpl : public flora::Reply {
+public:
+  ReplyImpl(std::shared_ptr<Client> &&c, int32_t id);
+
+  ~ReplyImpl() noexcept;
+
+  void write_code(int32_t code);
+
+  void write_data(std::shared_ptr<Caps> &data);
+
+  void end();
+
+  void end(int32_t code);
+
+  void end(int32_t code, std::shared_ptr<Caps> &data);
+
+private:
+  std::shared_ptr<Client> client;
+  int32_t ret_code = FLORA_CLI_SUCCESS;
+  std::shared_ptr<Caps> data;
+  int32_t callid = 0;
+};
+
 } // namespace internal
 } // namespace flora
+
+typedef struct {
+  std::shared_ptr<flora::Reply> cxxreply;
+} CReply;
