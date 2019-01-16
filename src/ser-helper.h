@@ -10,7 +10,7 @@ namespace internal {
 
 class RequestSerializer {
 public:
-  static int32_t serialize_auth(uint32_t version, const char *extra, void *data,
+  static int32_t serialize_auth(uint32_t version, const char *extra, int32_t pid, void *data,
                                 uint32_t size, uint32_t flags);
 
   static int32_t serialize_subscribe(const char *name, void *data,
@@ -59,7 +59,7 @@ public:
 class RequestParser {
 public:
   static int32_t parse_auth(std::shared_ptr<Caps> &caps, uint32_t &version,
-                            std::string &extra);
+                            std::string &extra, int32_t &pid);
 
   static int32_t parse_subscribe(std::shared_ptr<Caps> &caps,
                                  std::string &name);

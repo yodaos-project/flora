@@ -33,6 +33,11 @@ typedef struct {
   std::chrono::steady_clock::time_point discard_tp;
 } PendingCall;
 typedef std::list<PendingCall> PendingCallList;
+typedef struct {
+  int32_t pid;
+  std::shared_ptr<Adapter> adapter;
+} AdapterDebugInfo;
+typedef std::map<intptr_t, AdapterDebugInfo> AdapterDebugInfoMap;
 
 class Dispatcher : public flora::Dispatcher {
 public:
@@ -92,6 +97,19 @@ private:
 
   void discard_pending_calls();
 
+  bool post_msg(const std::string& name, uint32_t type,
+      std::shared_ptr<Caps> &args, Adapter *sender);
+
+  void write_post_msg_to_adapters(const std::string &name, uint32_t type,
+      std::shared_ptr<Caps> &args, uint32_t flags, AdapterList &adapters,
+      const char *sender_name);
+
+  void add_adapter_debug_info(int32_t pid, std::shared_ptr<Adapter> &adapter);
+
+  void erase_adapter_debug_info(std::shared_ptr<Adapter> &sender);
+
+  void update_adapter_debug_infos();
+
 private:
   SubscriptionMap subscriptions;
   PersistMsgMap persist_msgs;
@@ -104,6 +122,8 @@ private:
   std::thread run_thread;
   PendingCallList pending_calls;
   int32_t reqseq = 0;
+  AdapterDebugInfoMap adapter_debug_infos;
+  std::string monitor_persist_msg_name;
   bool working = false;
 
   static bool (Dispatcher::*msg_handlers[MSG_HANDLER_COUNT])(
