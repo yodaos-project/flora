@@ -7,12 +7,13 @@ namespace flora {
 namespace internal {
 
 int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra,
-                                          void *data, uint32_t size,
-                                          uint32_t flags) {
+                                          int32_t pid, void *data,
+                                          uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_REQ);
   caps->write(version);
   caps->write(extra);
+  caps->write(pid);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -195,11 +196,14 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
 }
 
 int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,
-                                  string &extra) {
+                                  string &extra, int32_t &pid) {
   if (caps->read(version) != CAPS_SUCCESS)
     return -1;
   if (caps->read(extra) != CAPS_SUCCESS)
     return -1;
+  if (caps->read(pid) != CAPS_SUCCESS) {
+    pid = 0;
+  }
   return 0;
 }
 

@@ -23,6 +23,8 @@ bool (Dispatcher::*(Dispatcher::msg_handlers[MSG_HANDLER_COUNT]))(
     &Dispatcher::handle_remove_method,   &Dispatcher::handle_call_req};
 
 Dispatcher::Dispatcher(uint32_t bufsize) {
+  monitor_persist_msg_name = "--dfdc9571857b9306326d9bb3ef5fe71299796858--";
+
   buf_size = bufsize > DEFAULT_MSG_BUF_SIZE ? bufsize : DEFAULT_MSG_BUF_SIZE;
   buffer = (int8_t *)mmap(NULL, buf_size, PROT_READ | PROT_WRITE,
                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -100,6 +102,7 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
     if (sender->auth_extra.length() > 0) {
       named_adapters.erase(sender->auth_extra);
     }
+    erase_adapter_debug_info(sender);
     return;
   }
 
@@ -159,8 +162,9 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
                                  shared_ptr<Adapter> &sender) {
   uint32_t version;
   string extra;
+  int32_t pid;
 
-  if (RequestParser::parse_auth(msg_caps, version, extra) != 0)
+  if (RequestParser::parse_auth(msg_caps, version, extra, pid) != 0)
     return false;
   KLOGI(TAG, "<<< %s: auth ver %u", extra.c_str(), version);
   int32_t result = FLORA_CLI_SUCCESS;
@@ -177,7 +181,40 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
   if (c < 0)
     return false;
   sender->write(buffer, c);
+  add_adapter_debug_info(pid, sender);
   return result == FLORA_CLI_SUCCESS;
+}
+
+void Dispatcher::add_adapter_debug_info(int32_t pid,
+                                        shared_ptr<Adapter> &adapter) {
+  AdapterDebugInfo info;
+  info.pid = pid;
+  info.adapter = adapter;
+  adapter_debug_infos.insert(
+      make_pair(reinterpret_cast<intptr_t>(adapter.get()), info));
+
+  update_adapter_debug_infos();
+}
+
+void Dispatcher::erase_adapter_debug_info(shared_ptr<Adapter> &sender) {
+  adapter_debug_infos.erase(reinterpret_cast<intptr_t>(sender.get()));
+
+  update_adapter_debug_infos();
+}
+
+void Dispatcher::update_adapter_debug_infos() {
+  shared_ptr<Caps> data = Caps::new_instance();
+  shared_ptr<Caps> sub;
+  AdapterDebugInfoMap::iterator it;
+
+  for (it = adapter_debug_infos.begin(); it != adapter_debug_infos.end();
+       ++it) {
+    sub = Caps::new_instance();
+    sub->write(it->second.pid);
+    sub->write(it->second.adapter->auth_extra);
+    data->write(sub);
+  }
+  post_msg(monitor_persist_msg_name, FLORA_MSGTYPE_PERSIST, data, nullptr);
 }
 
 bool Dispatcher::handle_subscribe_req(shared_ptr<Caps> &msg_caps,
@@ -266,20 +303,23 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps> &msg_caps,
 
   if (RequestParser::parse_post(msg_caps, name, msgtype, args) != 0)
     return false;
-  if (!is_valid_msgtype(msgtype))
+  return post_msg(name, msgtype, args, sender.get());
+}
+
+bool Dispatcher::post_msg(const string &name, uint32_t type,
+                          shared_ptr<Caps> &args, Adapter *sender) {
+  if (!is_valid_msgtype(type))
     return false;
-  KLOGI(TAG, "<<< %s: post %u..%s", sender->auth_extra.c_str(), msgtype,
-        name.c_str());
+  const char *cli_name = sender ? sender->auth_extra.c_str() : "";
+  KLOGI(TAG, "<<< %s: post %u..%s", cli_name, type, name.c_str());
   if (name.length() == 0)
     return false;
 
   SubscriptionMap::iterator sit;
   sit = subscriptions.find(name);
   if (sit != subscriptions.end() && !sit->second.empty()) {
-    int32_t c = ResponseSerializer::serialize_post(
-        name.c_str(), msgtype, args, buffer, buf_size, sender->serialize_flags);
-    if (c < 0)
-      return false;
+    AdapterList nobo_adapters; // no net byteorder
+    AdapterList bo_adapters;   // net byteorder
     AdapterList::iterator ait;
     ait = sit->second.begin();
     while (ait != sit->second.end()) {
@@ -289,18 +329,42 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps> &msg_caps,
         sit->second.erase(dit);
         continue;
       }
-      KLOGI(TAG, "%s >>> %s: post %u..%s", sender->auth_extra.c_str(),
-            (*ait)->auth_extra.c_str(), msgtype, name.c_str());
-      (*ait)->write(buffer, c);
+      if ((*ait)->serialize_flags == CAPS_FLAG_NET_BYTEORDER) {
+        bo_adapters.push_back(*ait);
+      } else {
+        nobo_adapters.push_back(*ait);
+      }
       ++ait;
     }
+    write_post_msg_to_adapters(name, type, args, 0, nobo_adapters, cli_name);
+    write_post_msg_to_adapters(name, type, args, CAPS_FLAG_NET_BYTEORDER,
+                               bo_adapters, cli_name);
   }
 
-  if (msgtype == FLORA_MSGTYPE_PERSIST) {
+  if (type == FLORA_MSGTYPE_PERSIST) {
     PersistMsg &pmsg = persist_msgs[name];
     pmsg.data = args;
   }
   return true;
+}
+
+void Dispatcher::write_post_msg_to_adapters(const string &name, uint32_t type,
+                                            shared_ptr<Caps> &args,
+                                            uint32_t flags,
+                                            AdapterList &adapters,
+                                            const char *sender_name) {
+  int32_t c = ResponseSerializer::serialize_post(name.c_str(), type, args,
+                                                 buffer, buf_size, flags);
+  if (c < 0)
+    return;
+  AdapterList::iterator ait;
+  ait = adapters.begin();
+  while (ait != adapters.end()) {
+    KLOGI(TAG, "%s >>> %s: post %u..%s", sender_name,
+          (*ait)->auth_extra.c_str(), type, name.c_str());
+    (*ait)->write(buffer, c);
+    ++ait;
+  }
 }
 
 void Dispatcher::add_pending_call(int32_t svrid, int32_t cliid,
@@ -353,7 +417,7 @@ bool Dispatcher::handle_call_req(shared_ptr<Caps> &msg_caps,
   int32_t svrid = ++reqseq;
   add_pending_call(svrid, cliid, sender, it->second, timeout);
   c = ResponseSerializer::serialize_call(name.c_str(), args, svrid, buffer,
-                                         buf_size, sender->serialize_flags);
+                                         buf_size, it->second->serialize_flags);
   if (c < 0)
     return false;
   KLOGI(TAG, "%s >>> %s: call %d/%s", sender->auth_extra.c_str(),

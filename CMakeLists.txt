@@ -112,9 +112,25 @@ target_link_libraries(flora-cli
   ${mutils_LIBRARIES}
 )
 
+file(GLOB monitor_SOURCES
+  monitor/*.cc
+  monitor/*.h
+)
+add_executable(flora-monitor ${monitor_SOURCES})
+target_include_directories(flora-monitor PRIVATE
+  include
+  ${mutils_INCLUDE_DIRS}
+)
+target_link_libraries(flora-monitor
+  flora-cli
+  ${mutils_LIBRARIES}
+  -lncurses
+)
+
 # install
-install(TARGETS flora-svc flora-cli
+install(TARGETS flora-svc flora-cli flora-monitor
   LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 file(GLOB flora_headers include/*.h)
 install(FILES ${flora_headers} DESTINATION include)
