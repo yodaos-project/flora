@@ -29,7 +29,7 @@ static void printTabCell(int32_t idx, const char* content) {
   if (len > COLUMN_WIDTH[idx])
     len = COLUMN_WIDTH[idx];
   memcpy(textBuffer, content, len);
-  int r = printw("%s", textBuffer);
+  printw("%s", textBuffer);
 }
 
 static void printTabHeader() {
@@ -73,6 +73,9 @@ static void updateMonitorScreen(shared_ptr<Caps> &msg) {
 
 static void doMonitor(CmdlineArgs &args) {
   initscr();
+  raw();
+  keypad(stdscr, TRUE);
+  noecho();
 
   Agent agent;
   agent.config(FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#flora-monitor");
