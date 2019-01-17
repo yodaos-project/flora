@@ -185,11 +185,13 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
   return result == FLORA_CLI_SUCCESS;
 }
 
-void Dispatcher::add_adapter_debug_info(int32_t pid, shared_ptr<Adapter> &adapter) {
+void Dispatcher::add_adapter_debug_info(int32_t pid,
+                                        shared_ptr<Adapter> &adapter) {
   AdapterDebugInfo info;
   info.pid = pid;
   info.adapter = adapter;
-  adapter_debug_infos.insert(make_pair(reinterpret_cast<intptr_t>(adapter.get()), info));
+  adapter_debug_infos.insert(
+      make_pair(reinterpret_cast<intptr_t>(adapter.get()), info));
 
   update_adapter_debug_infos();
 }
@@ -205,7 +207,8 @@ void Dispatcher::update_adapter_debug_infos() {
   shared_ptr<Caps> sub;
   AdapterDebugInfoMap::iterator it;
 
-  for (it = adapter_debug_infos.begin(); it != adapter_debug_infos.end(); ++it) {
+  for (it = adapter_debug_infos.begin(); it != adapter_debug_infos.end();
+       ++it) {
     sub = Caps::new_instance();
     sub->write(it->second.pid);
     sub->write(it->second.adapter->auth_extra);
@@ -303,12 +306,12 @@ bool Dispatcher::handle_post_req(shared_ptr<Caps> &msg_caps,
   return post_msg(name, msgtype, args, sender.get());
 }
 
-bool Dispatcher::post_msg(const string& name, uint32_t type, shared_ptr<Caps> &args, Adapter *sender) {
+bool Dispatcher::post_msg(const string &name, uint32_t type,
+                          shared_ptr<Caps> &args, Adapter *sender) {
   if (!is_valid_msgtype(type))
     return false;
   const char *cli_name = sender ? sender->auth_extra.c_str() : "";
-  KLOGI(TAG, "<<< %s: post %u..%s", cli_name, type,
-        name.c_str());
+  KLOGI(TAG, "<<< %s: post %u..%s", cli_name, type, name.c_str());
   if (name.length() == 0)
     return false;
 
@@ -316,7 +319,7 @@ bool Dispatcher::post_msg(const string& name, uint32_t type, shared_ptr<Caps> &a
   sit = subscriptions.find(name);
   if (sit != subscriptions.end() && !sit->second.empty()) {
     AdapterList nobo_adapters; // no net byteorder
-    AdapterList bo_adapters; // net byteorder
+    AdapterList bo_adapters;   // net byteorder
     AdapterList::iterator ait;
     ait = sit->second.begin();
     while (ait != sit->second.end()) {
@@ -334,7 +337,8 @@ bool Dispatcher::post_msg(const string& name, uint32_t type, shared_ptr<Caps> &a
       ++ait;
     }
     write_post_msg_to_adapters(name, type, args, 0, nobo_adapters, cli_name);
-    write_post_msg_to_adapters(name, type, args, CAPS_FLAG_NET_BYTEORDER, bo_adapters, cli_name);
+    write_post_msg_to_adapters(name, type, args, CAPS_FLAG_NET_BYTEORDER,
+                               bo_adapters, cli_name);
   }
 
   if (type == FLORA_MSGTYPE_PERSIST) {
@@ -344,11 +348,13 @@ bool Dispatcher::post_msg(const string& name, uint32_t type, shared_ptr<Caps> &a
   return true;
 }
 
-void Dispatcher::write_post_msg_to_adapters(const string &name,
-    uint32_t type, shared_ptr<Caps> &args, uint32_t flags,
-    AdapterList &adapters, const char *sender_name) {
-  int32_t c = ResponseSerializer::serialize_post(
-      name.c_str(), type, args, buffer, buf_size, flags);
+void Dispatcher::write_post_msg_to_adapters(const string &name, uint32_t type,
+                                            shared_ptr<Caps> &args,
+                                            uint32_t flags,
+                                            AdapterList &adapters,
+                                            const char *sender_name) {
+  int32_t c = ResponseSerializer::serialize_post(name.c_str(), type, args,
+                                                 buffer, buf_size, flags);
   if (c < 0)
     return;
   AdapterList::iterator ait;

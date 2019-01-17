@@ -1,26 +1,26 @@
-#include <stdio.h>
-#include <curses.h>
-#include <string.h>
 #include "flora-agent.h"
+#include <curses.h>
+#include <stdio.h>
+#include <string.h>
 
 using namespace std;
 using namespace flora;
 
 #define MONITOR_MSG_NAME "--dfdc9571857b9306326d9bb3ef5fe71299796858--"
 
-static const uint32_t COLUMN_WIDTH[] = { 8, 32 };
+static const uint32_t COLUMN_WIDTH[] = {8, 32};
 #define COLUMN_PAD 1
 static char textBuffer[64];
-static const char *COLUMN_HEADER_TEXT[] = { "PID", "NAME" };
+static const char *COLUMN_HEADER_TEXT[] = {"PID", "NAME"};
 
 typedef struct {
 } CmdlineArgs;
 
-static bool parseCmdline(int argc, char** argv, CmdlineArgs &res) {
+static bool parseCmdline(int argc, char **argv, CmdlineArgs &res) {
   return true;
 }
 
-static void printTabCell(int32_t idx, const char* content) {
+static void printTabCell(int32_t idx, const char *content) {
   uint32_t width = COLUMN_WIDTH[idx] + COLUMN_PAD;
   int32_t len;
   memset(textBuffer, ' ', width);
@@ -35,7 +35,6 @@ static void printTabCell(int32_t idx, const char* content) {
 static void printTabHeader() {
   uint32_t numCol = sizeof(COLUMN_WIDTH) / sizeof(COLUMN_WIDTH[0]);
   uint32_t i;
-  uint32_t width;
 
   for (i = 0; i < numCol; ++i) {
     printTabCell(i, COLUMN_HEADER_TEXT[i]);
@@ -78,10 +77,10 @@ static void doMonitor(CmdlineArgs &args) {
   noecho();
 
   Agent agent;
-  agent.config(FLORA_AGENT_CONFIG_URI, "unix:/var/run/flora.sock#flora-monitor");
-  agent.subscribe(MONITOR_MSG_NAME, [](const char *, shared_ptr<Caps> &msg, uint32_t) {
-    updateMonitorScreen(msg);
-  });
+  agent.config(FLORA_AGENT_CONFIG_URI,
+               "unix:/var/run/flora.sock#flora-monitor");
+  agent.subscribe(MONITOR_MSG_NAME, [](const char *, shared_ptr<Caps> &msg,
+                                       uint32_t) { updateMonitorScreen(msg); });
   agent.start();
 
   int c;
@@ -98,7 +97,7 @@ static void doMonitor(CmdlineArgs &args) {
   endwin();
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   CmdlineArgs cmdlineArgs;
 
   if (!parseCmdline(argc, argv, cmdlineArgs)) {

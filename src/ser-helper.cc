@@ -6,9 +6,9 @@ using namespace std;
 namespace flora {
 namespace internal {
 
-int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra, int32_t pid,
-                                          void *data, uint32_t size,
-                                          uint32_t flags) {
+int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra,
+                                          int32_t pid, void *data,
+                                          uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_REQ);
   caps->write(version);

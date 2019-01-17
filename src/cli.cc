@@ -96,8 +96,9 @@ int32_t Client::connect(const char *uri, ClientCallback *cb) {
 }
 
 int32_t Client::auth(const string &extra) {
-  int32_t c = RequestSerializer::serialize_auth(
-      FLORA_VERSION, extra.c_str(), getpid(), sbuffer, buf_size, serialize_flags);
+  int32_t c =
+      RequestSerializer::serialize_auth(FLORA_VERSION, extra.c_str(), getpid(),
+                                        sbuffer, buf_size, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EAUTH;
   if (!connection->send(sbuffer, c))

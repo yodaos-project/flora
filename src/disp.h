@@ -97,12 +97,13 @@ private:
 
   void discard_pending_calls();
 
-  bool post_msg(const std::string& name, uint32_t type,
-      std::shared_ptr<Caps> &args, Adapter *sender);
+  bool post_msg(const std::string &name, uint32_t type,
+                std::shared_ptr<Caps> &args, Adapter *sender);
 
   void write_post_msg_to_adapters(const std::string &name, uint32_t type,
-      std::shared_ptr<Caps> &args, uint32_t flags, AdapterList &adapters,
-      const char *sender_name);
+                                  std::shared_ptr<Caps> &args, uint32_t flags,
+                                  AdapterList &adapters,
+                                  const char *sender_name);
 
   void add_adapter_debug_info(int32_t pid, std::shared_ptr<Adapter> &adapter);
 

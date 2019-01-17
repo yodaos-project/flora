@@ -10,8 +10,9 @@ namespace internal {
 
 class RequestSerializer {
 public:
-  static int32_t serialize_auth(uint32_t version, const char *extra, int32_t pid, void *data,
-                                uint32_t size, uint32_t flags);
+  static int32_t serialize_auth(uint32_t version, const char *extra,
+                                int32_t pid, void *data, uint32_t size,
+                                uint32_t flags);
 
   static int32_t serialize_subscribe(const char *name, void *data,
                                      uint32_t size, uint32_t flags);
