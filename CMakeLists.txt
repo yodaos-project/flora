@@ -26,6 +26,12 @@ findPackage(mutils REQUIRED
   STATIC_LIBS misc
 )
 
+findPackage(ncurses
+  HINTS ${ncursesPrefix}
+  HEADERS curses.h
+  SHARED_LIBS ncurses
+)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 if (NOT COMPILER_IS_CLANG)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
@@ -108,6 +114,7 @@ target_link_libraries(flora-cli
   ${mutils_LIBRARIES}
 )
 
+if (ncurses_LIBRARIES)
 file(GLOB monitor_SOURCES
   monitor/*.cc
   monitor/*.h
@@ -116,12 +123,14 @@ add_executable(flora-monitor ${monitor_SOURCES})
 target_include_directories(flora-monitor PRIVATE
   include
   ${mutils_INCLUDE_DIRS}
+  ${ncurses_INCLUDE_DIRS}
 )
 target_link_libraries(flora-monitor
   flora-cli
   ${mutils_LIBRARIES}
-  -lncurses
+  ${ncurses_LIBRARIES}
 )
+endif(ncurses_LIBRARIES)
 
 # install
 install(TARGETS flora-svc flora-cli flora-monitor

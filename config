@@ -18,6 +18,7 @@ Configuration:
 
 Dependencies:
     --mutils=DIR                specify mutils install dir
+    --ncurses=DIR               specify ncurses install dir
 
 Cross Compile:
     --toolchain=DIR             toolchain install dir
@@ -64,6 +65,9 @@ do
       ;;
     --mutils=*)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DmutilsPrefix=$conf_optarg)
+      ;;
+    --ncurses=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DncursesPrefix=$conf_optarg)
       ;;
     --toolchain=*)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DTOOLCHAIN_HOME=$conf_optarg)
