@@ -130,12 +130,14 @@ target_link_libraries(flora-monitor
   ${mutils_LIBRARIES}
   ${ncurses_LIBRARIES}
 )
+install(TARGETS flora-monitor
+  RUNTIME DESTINATION bin
+)
 endif(ncurses_LIBRARIES)
 
 # install
-install(TARGETS flora-svc flora-cli flora-monitor
+install(TARGETS flora-svc flora-cli
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
 )
 file(GLOB flora_headers include/*.h)
 install(FILES ${flora_headers} DESTINATION include)
