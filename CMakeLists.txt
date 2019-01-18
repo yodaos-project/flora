@@ -76,11 +76,9 @@ set(flora_svc_SOURCES
 add_library(flora-svc SHARED
   ${flora_svc_SOURCES}
 )
-target_include_directories(flora-svc
-  PRIVATE
-    ${mutils_INCLUDE_DIRS}
-  PUBLIC
+target_include_directories(flora-svc PRIVATE
     include
+    ${mutils_INCLUDE_DIRS}
 )
 target_link_libraries(flora-svc
   ${mutils_LIBRARIES}
@@ -102,11 +100,9 @@ set(flora_cli_SOURCES
 add_library(flora-cli SHARED
   ${flora_cli_SOURCES}
 )
-target_include_directories(flora-cli
-  PRIVATE
-    ${mutils_INCLUDE_DIRS}
-  PUBLIC
+target_include_directories(flora-cli PRIVATE
     include
+    ${mutils_INCLUDE_DIRS}
 )
 target_link_libraries(flora-cli
   ${mutils_LIBRARIES}
