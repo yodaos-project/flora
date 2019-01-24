@@ -36,53 +36,50 @@ typedef struct {
 } CmdlineArgs;
 
 static bool parse_cmdline(int argc, char **argv, CmdlineArgs *args) {
-  clargs_h h = clargs_parse(argc, argv);
-  if (h == 0) {
+  shared_ptr<CLArgs> h = CLArgs::parse(argc, argv);
+  if (h == nullptr) {
     print_prompt(argv[0]);
     return false;
   }
-  if (clargs_opt_has(h, "help")) {
+  if (h->find("help", nullptr, nullptr)) {
     print_prompt(argv[0]);
-    clargs_destroy(h);
     return false;
   }
-  const char *v = clargs_opt_get(h, "client-num");
-  char *ep;
-  if (v == nullptr) {
-    args->client_num = 2;
-  } else {
-    args->client_num = strtol(v, &ep, 10);
-    if (ep[0] != '\0' || args->client_num <= 1) {
-      KLOGE(TAG, "invalid --client-num=%s", v);
-      clargs_destroy(h);
+  uint32_t begin, end;
+  CLPair pair;
+  if (h->find("client-num", &begin, &end)) {
+    h->at(begin, pair);
+    if (pair.value == nullptr)
+      args->client_num = 2;
+    else if (!pair.to_integer(args->client_num)) {
+      KLOGE(TAG, "invalid --client-num=%s", pair.value);
       return false;
     }
   }
-  v = clargs_opt_get(h, "repeat");
-  if (v == nullptr) {
-    args->repeat = 1;
-  } else {
-    args->repeat = strtol(v, &ep, 10);
-    if (ep[0] != '\0' || args->repeat <= 0) {
-      KLOGE(TAG, "invalid --repeat=%s", v);
-      clargs_destroy(h);
+  if (h->find("repeat", &begin, &end)) {
+    h->at(begin, pair);
+    if (pair.value == nullptr)
+      args->repeat = 1;
+    else if (!pair.to_integer(args->repeat)) {
+      KLOGE(TAG, "invalid --repeat=%s", pair.value);
       return false;
     }
   }
-  v = clargs_opt_get(h, "comm-type");
-  if (v == nullptr) {
-    args->comm_type = COMM_TYPE_UNIX;
-  } else {
-    if (strcmp(v, "tcp") == 0)
-      args->comm_type = COMM_TYPE_TCP;
-    else
+  if (h->find("comm-type", &begin, &end)) {
+    h->at(begin, pair);
+    if (pair.value == nullptr)
       args->comm_type = COMM_TYPE_UNIX;
+    else {
+      if (strcmp(pair.value, "tcp") == 0)
+        args->comm_type = COMM_TYPE_TCP;
+      else
+        args->comm_type = COMM_TYPE_UNIX;
+    }
   }
-  if (clargs_opt_has(h, "use-c-api"))
+  if (h->find("use-c-api", nullptr, nullptr))
     args->use_c_api = 1;
   else
     args->use_c_api = 0;
-  clargs_destroy(h);
   return true;
 }
 
