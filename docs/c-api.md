@@ -199,6 +199,7 @@ FLORA\_CLI\_EINVAL | 参数非法
 FLORA\_CLI\_ECONN | flora service连接错误
 FLORA\_CLI\_ETIMEOUT | 超时无回复
 FLORA\_CLI\_ENEXISTS | 远程方法未找到
+FLORA_CLI_EDEADLOCK | 在回调函数中调用此方法，将造成无限阻塞
 
 ---
 

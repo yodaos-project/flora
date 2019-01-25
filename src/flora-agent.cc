@@ -146,6 +146,11 @@ void Agent::close() {
   if (working) {
     working = false;
     conn_cond.notify_one();
+    shared_ptr<flora::internal::Client> cli = static_pointer_cast<flora::internal::Client>(flora_cli);
+    if (cli != nullptr && cli->close(false) == FLORA_CLI_EDEADLOCK) {
+      thread tmp([cli]() { cli->close(false); });
+      tmp.detach();
+    }
     flora_cli.reset();
     post_handlers.clear();
     call_handlers.clear();

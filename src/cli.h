@@ -15,11 +15,12 @@
 namespace flora {
 namespace internal {
 
+typedef std::function<void(int32_t, Response &)> RespCallback;
 typedef struct {
   int32_t id;
   int32_t rcode;
   Response *result;
-  std::function<void(int32_t, Response &)> callback;
+  RespCallback callback;
 } PendingRequest;
 typedef std::list<PendingRequest> PendingRequestList;
 
@@ -31,7 +32,7 @@ public:
 
   int32_t connect(const char *uri, ClientCallback *cb);
 
-  void close(bool passive);
+  int32_t close(bool passive);
 
   void set_weak_ptr(std::shared_ptr<Client> &ptr) { this_weak_ptr = ptr; }
 
@@ -80,6 +81,7 @@ private:
   uint32_t serialize_flags = 0;
   int32_t close_reason = 0;
   std::weak_ptr<Client> this_weak_ptr;
+  std::thread::id callback_thr_id;
 
 public:
   std::string auth_extra;

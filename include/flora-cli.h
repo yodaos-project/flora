@@ -20,6 +20,8 @@
 #define FLORA_CLI_EINSUFF_BUF -7
 // 客户端主动关闭
 #define FLORA_CLI_ECLOSED -8
+// 在回调线程中调用call(阻塞模式)
+#define FLORA_CLI_EDEADLOCK -9
 
 #define FLORA_MSGTYPE_INSTANT 0
 #define FLORA_MSGTYPE_PERSIST 1
