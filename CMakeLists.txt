@@ -18,6 +18,33 @@ include (${CUSTOM_CMAKE_MODULES}/common.mk)
 option(BUILD_DEBUG "debug or release" OFF)
 option(BUILD_TEST "build unit-tests" OFF)
 
+function(parseLogLevel varName)
+if (NOT ${varName})
+  set(${varName} 2 PARENT_SCOPE)
+else()
+  unset(llv CACHE)
+  if (${varName} STREQUAL "verbose")
+    set(llv 0)
+  elseif (${varName} STREQUAL "debug")
+    set(llv 1)
+  elseif (${varName} STREQUAL "info")
+    set(llv 2)
+  elseif (${varName} STREQUAL "warning")
+    set(llv 3)
+  elseif (${varName} STREQUAL "error")
+    set(llv 4)
+  elseif (${varName} STREQUAL "none")
+    set(llv 5)
+  else ()
+    set(llv 2)
+  endif()
+  set(${varName} ${llv} PARENT_SCOPE)
+endif()
+endfunction(parseLogLevel)
+
+parseLogLevel(SVC_LOGLEVEL)
+parseLogLevel(CLI_LOGLEVEL)
+
 findPackage(mutils REQUIRED
   HINTS ${mutilsPrefix}
   INC_PATH_SUFFIX log caps misc
@@ -46,19 +73,6 @@ endif()
 if (CROSS_COMPILE_CXXFLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CROSS_COMPILE_CXXFLAGS}")
 endif()
-set(LogLevel 2)
-if (LOG_ENABLED STREQUAL "verbose")
-  set(LogLevel 0)
-elseif (LOG_ENABLED STREQUAL "debug")
-  set(LogLevel 1)
-elseif (LOG_ENABLED STREQUAL "info")
-  set(LogLevel 2)
-elseif (LOG_ENABLED STREQUAL "warn")
-  set(LogLevel 3)
-elseif (LOG_ENABLED STREQUAL "error")
-  set(LogLevel 4)
-endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DROKID_LOG_ENABLED=${LogLevel}")
 
 #file(GLOB_RECURSE UWS_SOURCES 
 # src/*.h
@@ -89,6 +103,7 @@ target_include_directories(flora-svc PRIVATE
 target_link_libraries(flora-svc
   ${mutils_LIBRARIES}
 )
+target_compile_options(flora-svc PRIVATE -DROKID_LOG_ENABLED=${SVC_LOGLEVEL})
 
 set(flora_cli_SOURCES
   include/flora-cli.h
@@ -113,6 +128,7 @@ target_include_directories(flora-cli PRIVATE
 target_link_libraries(flora-cli
   ${mutils_LIBRARIES}
 )
+target_compile_options(flora-cli PRIVATE -DROKID_LOG_ENABLED=${CLI_LOGLEVEL})
 
 if (ncurses_LIBRARIES)
 file(GLOB monitor_SOURCES
