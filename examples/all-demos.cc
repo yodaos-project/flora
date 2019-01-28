@@ -374,15 +374,18 @@ void DemoAllInOne::test_invoke_in_callback() {
 
   snprintf(buf, sizeof(buf), "%s#%s", SERVICE_URI, targetName);
   agent.config(FLORA_AGENT_CONFIG_URI, buf);
-  agent.subscribe("foo", [&agent](const char* name, shared_ptr<Caps> &, uint32_t) {
-      shared_ptr<Caps> empty;
-      Response resp;
-      int32_t r = agent.call("not-exists", empty, "blah", resp);
-      KLOGI(TAG, "invoke 'call' in callback function, return %d, excepted %d", r, FLORA_CLI_EDEADLOCK);
-      r = agent.call("not-exists", empty, "blah", [](int32_t code, Response &) {
-        KLOGI(TAG, "invoke async 'call' in callback, return %d, excepted %d", code, FLORA_CLI_ENEXISTS);
-      });
-      agent.close();
+  agent.subscribe("foo", [&agent](const char *name, shared_ptr<Caps> &,
+                                  uint32_t) {
+    shared_ptr<Caps> empty;
+    Response resp;
+    int32_t r = agent.call("not-exists", empty, "blah", resp);
+    KLOGI(TAG, "invoke 'call' in callback function, return %d, excepted %d", r,
+          FLORA_CLI_EDEADLOCK);
+    r = agent.call("not-exists", empty, "blah", [](int32_t code, Response &) {
+      KLOGI(TAG, "invoke async 'call' in callback, return %d, excepted %d",
+            code, FLORA_CLI_ENEXISTS);
+    });
+    agent.close();
   });
   agent.start();
   shared_ptr<Caps> empty;
