@@ -58,6 +58,10 @@ floraClient->call("foo", msg, "exam-client", [](int32_t rescode, Response &resp)
 }, 0);
 ```
 
+## Warning!!!
+
+**Don't destruct flora::Client instance in callback function, may cause program crash**
+
 ## Methods
 
 ### <font color=#bdbdbd>(static)</font> connect(uri, cb, bufsize, result)
@@ -172,6 +176,7 @@ FLORA_CLI_EINVAL | 参数非法
 FLORA_CLI_ECONN | flora service连接错误
 FLORA_CLI_ENEXISTS | 找不到此远程调用方法
 FLORA_CLI_ETIMEOUT | 超时无回复
+FLORA_CLI_EDEADLOCK | 在回调函数中调用此方法，将造成无限阻塞
 
 ---
 

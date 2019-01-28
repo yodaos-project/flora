@@ -25,6 +25,8 @@ private:
 
   void test_reply_after_close();
 
+  void test_invoke_in_callback();
+
 private:
   std::shared_ptr<flora::Poll> poll;
   std::shared_ptr<flora::Dispatcher> dispatcher;

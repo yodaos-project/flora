@@ -66,10 +66,12 @@ public:
                Response &response, uint32_t timeout = 0);
 
   int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
-               std::function<void(int32_t, Response &)> &&cb, uint32_t timeout);
+               std::function<void(int32_t, Response &)> &&cb,
+               uint32_t timeout = 0);
 
   int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
-               std::function<void(int32_t, Response &)> &cb, uint32_t timeout);
+               std::function<void(int32_t, Response &)> &cb,
+               uint32_t timeout = 0);
 
   // override ClientCallback
   void recv_post(const char *name, uint32_t msgtype,

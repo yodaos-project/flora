@@ -118,6 +118,8 @@ int32_t Client::auth(const string &extra) {
 
 void Client::recv_loop() {
   int32_t err;
+
+  callback_thr_id = this_thread::get_id();
   while (true) {
     if (rbuf_off == buf_size) {
       KLOGW(TAG, "recv buffer not enough, %u bytes", buf_size);
@@ -214,10 +216,11 @@ bool Client::handle_received(int32_t size) {
             if (rescode != FLORA_CLI_SUCCESS) {
               response.ret_code = 0;
             }
-            req_mutex.unlock();
-            (*it).callback(rescode, response);
-            req_mutex.lock();
+            auto cb = (*it).callback;
             pending_requests.erase(it);
+            req_mutex.unlock();
+            cb(rescode, response);
+            req_mutex.lock();
           }
           break;
         }
@@ -265,10 +268,13 @@ void Client::iclose(bool passive, int32_t err) {
   }
 }
 
-void Client::close(bool passive) {
+int32_t Client::close(bool passive) {
+  if (this_thread::get_id() == callback_thr_id)
+    return FLORA_CLI_EDEADLOCK;
   iclose(passive, FLORA_CLI_ECLOSED);
   if (recv_thread.joinable())
     recv_thread.join();
+  return FLORA_CLI_SUCCESS;
 }
 
 void Client::send_reply(int32_t callid, int32_t code,
@@ -372,6 +378,8 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      const char *target, Response &reply, uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (this_thread::get_id() == callback_thr_id)
+    return FLORA_CLI_EDEADLOCK;
   int32_t c = RequestSerializer::serialize_call(
       name, msg, target, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
   if (c <= 0)
