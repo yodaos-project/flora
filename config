@@ -9,11 +9,12 @@ Configuration:
     --help                      display this help and exit
     --debug                     build for debug
     --test                      build unit-tests
-    --log-enabled=LEVEL         set log level (verbose|debug|info|warn|error)
     --build-dir=DIR             build directory
     --prefix=PREFIX             install prefix
     --cmake-modules=DIR         directory of cmake modules file exist
     --find-root-path=DIR        root dir for search dependencies libs
+    --svc-log-level=*           log level of flora service(verbose|debug|info|warning|error|none)
+    --cli-log-level=*           log level of flora client(verbose|debug|info|warning|error|none)
     --use-gcc                   force use gcc compiler (in macosx)
 
 Dependencies:
@@ -48,9 +49,6 @@ do
     --test)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_TEST=ON)
       ;;
-    --log-enabled=*)
-      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DLOG_ENABLED=$conf_optarg)
-      ;;
     --build-dir=*)
       builddir=$conf_optarg
       ;;
@@ -59,6 +57,12 @@ do
       ;;
     --cmake-modules=*)
       cmake_modules_dir=$conf_optarg
+      ;;
+    --svc-log-level=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DSVC_LOGLEVEL=$conf_optarg)
+      ;;
+    --cli-log-level=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCLI_LOGLEVEL=$conf_optarg)
       ;;
     --use-gcc)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DUSE_GCC=ON)
