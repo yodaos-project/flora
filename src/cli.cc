@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <signal.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -15,9 +16,15 @@ using rokid::Uri;
 
 #define TAG "flora.Client"
 
+static bool ignore_sigpipe = false;
 int32_t flora::Client::connect(const char *uri, flora::ClientCallback *cb,
                                uint32_t msg_buf_size,
                                shared_ptr<flora::Client> &result) {
+  if (!ignore_sigpipe) {
+    signal(SIGPIPE, SIG_IGN);
+    ignore_sigpipe = true;
+  }
+
   uint32_t bufsize =
       msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
   shared_ptr<flora::internal::Client> cli =

@@ -5,6 +5,7 @@
 #include "rlog.h"
 #include "ser-helper.h"
 #include <sys/mman.h>
+#include <signal.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -53,6 +54,7 @@ bool Dispatcher::put(const void *data, uint32_t size,
 }
 
 void Dispatcher::run(bool blocking) {
+  signal(SIGPIPE, SIG_IGN);
   working = true;
   if (blocking) {
     handle_cmds();

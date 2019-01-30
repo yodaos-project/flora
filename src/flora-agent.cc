@@ -148,14 +148,14 @@ void Agent::close() {
     conn_cond.notify_one();
     shared_ptr<flora::internal::Client> cli =
         static_pointer_cast<flora::internal::Client>(flora_cli);
-    if (cli != nullptr && cli->close(false) == FLORA_CLI_EDEADLOCK) {
-      thread tmp([cli]() { cli->close(false); });
-      tmp.detach();
-    }
     flora_cli.reset();
     post_handlers.clear();
     call_handlers.clear();
     locker.unlock();
+    if (cli != nullptr && cli->close(false) == FLORA_CLI_EDEADLOCK) {
+      thread tmp([cli]() { cli->close(false); });
+      tmp.detach();
+    }
     if (run_thread.joinable())
       run_thread.join();
   }
@@ -222,7 +222,6 @@ int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
 
 void Agent::destroy_client() {
   conn_mutex.lock();
-  flora_cli.reset();
   conn_cond.notify_one();
   conn_mutex.unlock();
 }
@@ -250,8 +249,7 @@ void Agent::recv_call(const char *name, shared_ptr<Caps> &msg,
 }
 
 void Agent::disconnected() {
-  thread tmp([this]() { this->destroy_client(); });
-  tmp.detach();
+  destroy_client();
 }
 
 } // namespace flora
