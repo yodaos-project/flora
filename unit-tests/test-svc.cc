@@ -3,7 +3,7 @@
 bool TestService::run(const char *uri, bool capi) {
   use_c_api = capi;
   if (capi) {
-    c_dispatcher = flora_dispatcher_new(0);
+    c_dispatcher = flora_dispatcher_new(0, 0);
     if (c_dispatcher == 0)
       return false;
     if (flora_poll_new(uri, &c_fpoll) != FLORA_POLL_SUCCESS) {
@@ -20,7 +20,7 @@ bool TestService::run(const char *uri, bool capi) {
     }
     flora_dispatcher_run(c_dispatcher, 0);
   } else {
-    dispatcher = Dispatcher::new_instance(0);
+    dispatcher = Dispatcher::new_instance(0, 0);
     fpoll = Poll::new_instance(uri);
     if (fpoll.get() == nullptr)
       return false;

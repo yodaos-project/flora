@@ -22,7 +22,7 @@ SocketAdapter::~SocketAdapter() {
   close();
 #ifdef FLORA_DEBUG
   KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
-        auth_extra.c_str(), recv_times, recv_bytes);
+        info ? info->name.c_str() : "", recv_times, recv_bytes);
 #endif
 }
 
@@ -31,10 +31,11 @@ int32_t SocketAdapter::read() {
     return SOCK_ADAPTER_ECLOSED;
   ssize_t c = ::read(socket, buffer + cur_size, buf_size - cur_size);
   if (c <= 0) {
-    if (c == 0)
-      KLOGE(TAG, "socket closed by remote");
-    else
+    if (c == 0) {
+      KLOGD(TAG, "socket closed by remote");
+    } else {
       KLOGE(TAG, "read socket failed: %s", strerror(errno));
+    }
     close();
     return SOCK_ADAPTER_ECLOSED;
   }

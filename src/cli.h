@@ -2,6 +2,7 @@
 
 #include "caps.h"
 #include "conn.h"
+#include "defs.h"
 #include "flora-cli.h"
 #include <chrono>
 #include <condition_variable>
@@ -30,7 +31,8 @@ public:
 
   ~Client() noexcept;
 
-  int32_t connect(const char *uri, ClientCallback *cb);
+  int32_t connect(const char *uri, uint32_t flags, ClientCallback *ccb,
+                  MonitorCallback *mcb);
 
   int32_t close(bool passive);
 
@@ -59,13 +61,29 @@ public:
                std::function<void(int32_t, Response &)> &cb, uint32_t timeout);
 
 private:
-  int32_t auth(const std::string &extra);
+  int32_t auth(const std::string &extra, uint32_t flags);
 
   void recv_loop();
 
   bool handle_received(int32_t size);
 
+  bool handle_cmd_before_auth(int32_t cmd, std::shared_ptr<Caps> &resp);
+
+  bool handle_cmd_after_auth(int32_t cmd, std::shared_ptr<Caps> &resp);
+
   void iclose(bool passive, int32_t err);
+
+  bool handle_monitor_list_all(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_list_add(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_list_remove(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_sub_all(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_sub_add(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_sub_remove(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_decl_all(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_decl_add(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_decl_remove(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_post(std::shared_ptr<Caps> &resp);
+  bool handle_monitor_call(std::shared_ptr<Caps> &resp);
 
 private:
   uint32_t buf_size;
@@ -82,10 +100,27 @@ private:
   int32_t close_reason = 0;
   std::weak_ptr<Client> this_weak_ptr;
   std::thread::id callback_thr_id;
+  // client flags
+  //   MONITOR
+  uint32_t flags = 0;
+  MonitorCallback *mon_callback = nullptr;
+  typedef bool (flora::internal::Client::*CmdHandler)(int32_t cmd, std::shared_ptr<Caps> &resp);
+  CmdHandler cmd_handler = &Client::handle_cmd_before_auth;
+  class AuthResult {
+  public:
+    std::mutex amutex;
+    std::condition_variable acond;
+    int32_t result = FLORA_CLI_EAUTH;
+  };
+  AuthResult *auth_result = nullptr;
+
+  typedef bool (flora::internal::Client::*MonitorHandler)(
+      std::shared_ptr<Caps> &);
+  static MonitorHandler monitor_handlers[MONITOR_SUBTYPE_NUM];
 
 public:
   std::string auth_extra;
-  ClientCallback *callback = nullptr;
+  ClientCallback *cli_callback = nullptr;
 #ifdef FLORA_DEBUG
   uint32_t post_times = 0;
   uint32_t post_bytes = 0;

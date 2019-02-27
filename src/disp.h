@@ -33,15 +33,11 @@ typedef struct {
   std::chrono::steady_clock::time_point discard_tp;
 } PendingCall;
 typedef std::list<PendingCall> PendingCallList;
-typedef struct {
-  int32_t pid;
-  std::shared_ptr<Adapter> adapter;
-} AdapterDebugInfo;
-typedef std::map<intptr_t, AdapterDebugInfo> AdapterDebugInfoMap;
+typedef std::map<intptr_t, AdapterInfo> AdapterInfoMap;
 
 class Dispatcher : public flora::Dispatcher {
 public:
-  explicit Dispatcher(uint32_t bufsize);
+  Dispatcher(uint32_t flags, uint32_t bufsize);
 
   ~Dispatcher() noexcept;
 
@@ -50,8 +46,6 @@ public:
   void run(bool blocking);
 
   void close();
-
-  // bool put(Frame &frame, std::shared_ptr<Adapter> &sender);
 
   inline uint32_t max_msg_size() const { return buf_size; }
 
@@ -82,7 +76,11 @@ private:
   bool handle_reply_req(std::shared_ptr<Caps> &msg_caps,
                         std::shared_ptr<Adapter> &sender);
 
-  bool add_adapter(const std::string &name, std::shared_ptr<Adapter> &adapter);
+  bool add_adapter(const std::string &name, int32_t pid, uint32_t flags,
+                   std::shared_ptr<Adapter> &adapter);
+
+  void add_monitor(const std::string &name, int32_t pid, uint32_t flags,
+                   std::shared_ptr<Adapter> &adapter);
 
   void handle_cmds();
 
@@ -105,11 +103,20 @@ private:
                                   AdapterList &adapters,
                                   const char *sender_name);
 
-  void add_adapter_debug_info(int32_t pid, std::shared_ptr<Adapter> &adapter);
+  void do_erase_adapter(std::shared_ptr<Adapter> &sender);
 
-  void erase_adapter_debug_info(std::shared_ptr<Adapter> &sender);
+  void write_monitor_data(uint32_t flags, std::shared_ptr<Adapter> &adapter);
 
-  void update_adapter_debug_infos();
+  void write_monitor_list(std::shared_ptr<Adapter> &adapter);
+
+  void write_monitor_list_add(std::shared_ptr<Adapter> &newitem,
+                              Adapter *monitor);
+
+  void write_monitor_list_remove(uint32_t id, Adapter *monitor);
+
+  void write_monitor_list_add(std::shared_ptr<Adapter> &newitem);
+
+  void write_monitor_list_remove(uint32_t id);
 
 private:
   SubscriptionMap subscriptions;
@@ -123,8 +130,9 @@ private:
   std::thread run_thread;
   PendingCallList pending_calls;
   int32_t reqseq = 0;
-  AdapterDebugInfoMap adapter_debug_infos;
-  std::string monitor_persist_msg_name;
+  AdapterInfoMap adapter_infos;
+  AdapterInfoMap monitors;
+  uint32_t flags;
   bool working = false;
 
   static bool (Dispatcher::*msg_handlers[MSG_HANDLER_COUNT])(

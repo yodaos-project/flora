@@ -32,6 +32,8 @@ SocketPoll::SocketPoll(const std::string &host, int32_t port) {
   type = POLL_TYPE_TCP;
 }
 
+SocketPoll::~SocketPoll() { stop(); }
+
 int32_t SocketPoll::start(shared_ptr<flora::Dispatcher> &disp) {
   unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get())

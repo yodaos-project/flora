@@ -1,12 +1,11 @@
 #include "flora-agent.h"
 #include <curses.h>
+#include <list>
 #include <stdio.h>
 #include <string.h>
 
 using namespace std;
 using namespace flora;
-
-#define MONITOR_MSG_NAME "--dfdc9571857b9306326d9bb3ef5fe71299796858--"
 
 static const uint32_t COLUMN_WIDTH[] = {8, 32};
 #define COLUMN_PAD 1
@@ -20,55 +19,95 @@ static bool parseCmdline(int argc, char **argv, CmdlineArgs &res) {
   return true;
 }
 
-static void printTabCell(int32_t idx, const char *content) {
-  uint32_t width = COLUMN_WIDTH[idx] + COLUMN_PAD;
-  int32_t len;
-  memset(textBuffer, ' ', width);
-  textBuffer[width] = '\0';
-  len = strlen(content);
-  if (len > COLUMN_WIDTH[idx])
-    len = COLUMN_WIDTH[idx];
-  memcpy(textBuffer, content, len);
-  printw("%s", textBuffer);
-}
-
-static void printTabHeader() {
-  uint32_t numCol = sizeof(COLUMN_WIDTH) / sizeof(COLUMN_WIDTH[0]);
-  uint32_t i;
-
-  for (i = 0; i < numCol; ++i) {
-    printTabCell(i, COLUMN_HEADER_TEXT[i]);
-  }
-  printw("\n");
-}
-
-static void printTabLine(shared_ptr<Caps> &msg) {
-  int32_t pid;
+class FloraClientInfo {
+public:
+  uint32_t id = 0;
+  int32_t pid = 0;
   string name;
-  if (msg->read(pid) != CAPS_SUCCESS) {
-    return;
-  }
-  if (msg->read(name) != CAPS_SUCCESS) {
-    return;
-  }
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%d", pid);
-  printTabCell(0, buf);
-  printTabCell(1, name.c_str());
-  printw("\n");
-}
+  uint32_t flags = 0;
+};
 
-static void updateMonitorScreen(shared_ptr<Caps> &msg) {
-  clear();
-  printTabHeader();
-  shared_ptr<Caps> sub;
-  while (true) {
-    if (msg->read(sub) != CAPS_SUCCESS)
-      break;
-    printTabLine(sub);
+class MonitorView : public flora::MonitorCallback {
+public:
+  void list_all(std::vector<MonitorListItem> &items) {
+    auto it = items.begin();
+    while (it != items.end()) {
+      auto fcit = floraClients.emplace(floraClients.end());
+      fcit->id = it->id;
+      fcit->pid = it->pid;
+      fcit->name = it->name;
+      fcit->flags = it->flags;
+      ++it;
+    }
+    updateMonitorScreen();
   }
-  refresh();
-}
+
+  void list_add(MonitorListItem &item) {
+    auto fcit = floraClients.emplace(floraClients.end());
+    fcit->id = item.id;
+    fcit->pid = item.pid;
+    fcit->name = item.name;
+    fcit->flags = item.flags;
+    updateMonitorScreen();
+  }
+
+  void list_remove(uint32_t id) {
+    auto it = floraClients.begin();
+    while (it != floraClients.end()) {
+      if (it->id == id) {
+        floraClients.erase(it);
+        updateMonitorScreen();
+        break;
+      }
+      ++it;
+    }
+  }
+
+private:
+  void updateMonitorScreen() {
+    clear();
+    printTabHeader();
+    auto it = floraClients.begin();
+    while (it != floraClients.end()) {
+      printTabLine(*it);
+      ++it;
+    }
+    refresh();
+  }
+
+  void printTabHeader() {
+    uint32_t numCol = sizeof(COLUMN_WIDTH) / sizeof(COLUMN_WIDTH[0]);
+    uint32_t i;
+
+    for (i = 0; i < numCol; ++i) {
+      printTabCell(i, COLUMN_HEADER_TEXT[i]);
+    }
+    printw("\n");
+  }
+
+  void printTabLine(FloraClientInfo &info) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", info.pid);
+    printTabCell(0, buf);
+    printTabCell(1, info.name.c_str());
+    printw("\n");
+  }
+
+  void printTabCell(int32_t idx, const char *content) {
+    uint32_t width = COLUMN_WIDTH[idx] + COLUMN_PAD;
+    int32_t len;
+    memset(textBuffer, ' ', width);
+    textBuffer[width] = '\0';
+    len = strlen(content);
+    if (len > COLUMN_WIDTH[idx])
+      len = COLUMN_WIDTH[idx];
+    memcpy(textBuffer, content, len);
+    printw("%s", textBuffer);
+  }
+
+private:
+  list<FloraClientInfo> floraClients;
+};
 
 static void doMonitor(CmdlineArgs &args) {
   initscr();
@@ -77,10 +116,11 @@ static void doMonitor(CmdlineArgs &args) {
   noecho();
 
   Agent agent;
+  MonitorView monitorView;
   agent.config(FLORA_AGENT_CONFIG_URI,
                "unix:/var/run/flora.sock#flora-monitor");
-  agent.subscribe(MONITOR_MSG_NAME, [](const char *, shared_ptr<Caps> &msg,
-                                       uint32_t) { updateMonitorScreen(msg); });
+  agent.config(FLORA_AGENT_CONFIG_MONITOR, FLORA_CLI_FLAG_MONITOR,
+               &monitorView);
   agent.start();
 
   int c;

@@ -24,6 +24,8 @@ public:
 
   SocketPoll(const std::string &host, int32_t port);
 
+  ~SocketPoll();
+
   int32_t start(std::shared_ptr<flora::Dispatcher> &disp);
 
   void stop();

@@ -101,7 +101,7 @@ int32_t SocketConn::recv(void *data, uint32_t size) {
       }
       KLOGE(TAG, "read socket failed: %s", strerror(errno));
     } else if (c == 0) {
-      KLOGE(TAG, "read socket failed: remote closed");
+      KLOGD(TAG, "read socket failed: remote closed");
     }
     break;
   } while (true);
