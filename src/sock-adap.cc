@@ -20,10 +20,6 @@ SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
 
 SocketAdapter::~SocketAdapter() {
   close();
-#ifdef FLORA_DEBUG
-  KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
-        info ? info->name.c_str() : "", recv_times, recv_bytes);
-#endif
 }
 
 int32_t SocketAdapter::read() {
@@ -88,6 +84,10 @@ void SocketAdapter::close_nolock() {
     munmap(buffer, buf_size);
     buffer = nullptr;
     socket = -1;
+#ifdef FLORA_DEBUG
+    KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
+          info ? info->name.c_str() : "", recv_times, recv_bytes);
+#endif
   }
 }
 

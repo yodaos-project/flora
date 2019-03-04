@@ -154,6 +154,7 @@ void SocketPoll::run() {
       if (FD_ISSET(adap_it->first, &rfds)) {
         KLOGD(TAG, "read from fd %d", adap_it->first);
         if (!read_from_client(adap_it->second)) {
+          adap_it->second->close();
           dispatcher->erase_adapter(
               static_pointer_cast<Adapter>(adap_it->second));
           pending_delete_adapters.push_back(adap_it->first);
