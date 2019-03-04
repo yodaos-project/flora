@@ -91,12 +91,7 @@ void Dispatcher::handle_cmds() {
     // handle commands
     // may use thread poll at multi-core platform in future
     for (it = pending_cmds.begin(); it != pending_cmds.end(); ++it) {
-      if (it->second->info &&
-          (it->second->info->flags & FLORA_CLI_FLAG_MONITOR)) {
-        // monitor client should not send request
-        it->second->close();
-      } else
-        handle_cmd(it->first, it->second);
+      handle_cmd(it->first, it->second);
     }
     pending_cmds.clear();
   }
@@ -107,6 +102,12 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
   // empty caps msg, erase adapter
   if (msg_caps == nullptr) {
     do_erase_adapter(sender);
+    return;
+  }
+  if (sender->info &&
+      (sender->info->flags & FLORA_CLI_FLAG_MONITOR)) {
+    // monitor client should not send request
+    sender->close();
     return;
   }
 
