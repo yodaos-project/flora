@@ -7,14 +7,16 @@ namespace flora {
 namespace internal {
 
 int32_t RequestSerializer::serialize_auth(uint32_t version, const char *extra,
-                                          int32_t pid, void *data,
-                                          uint32_t size, uint32_t flags) {
+                                          int32_t pid, uint32_t flags,
+                                          void *data, uint32_t size,
+                                          uint32_t ser_flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_REQ);
   caps->write(version);
   caps->write(extra);
   caps->write(pid);
-  int32_t r = caps->serialize(data, size, flags);
+  caps->write(flags);
+  int32_t r = caps->serialize(data, size, ser_flags);
   if (r < 0)
     return -1;
   if (r > size)
@@ -195,15 +197,142 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
   return r;
 }
 
+static shared_ptr<Caps> serialize_monitor_list_item(AdapterInfo &info) {
+  shared_ptr<Caps> r = Caps::new_instance();
+  r->write(info.id);
+  r->write(info.pid);
+  r->write(info.name);
+  r->write(info.flags);
+  return r;
+}
+
+int32_t ResponseSerializer::serialize_monitor_list_all(AdapterInfoMap &infos,
+                                                       void *data,
+                                                       uint32_t size,
+                                                       uint32_t flags) {
+  shared_ptr<Caps> p = Caps::new_instance();
+  shared_ptr<Caps> s;
+
+  p->write(CMD_MONITOR_RESP);
+  p->write(MONITOR_LIST_ALL);
+  p->write((int32_t)infos.size());
+  auto it = infos.begin();
+  while (it != infos.end()) {
+    s = serialize_monitor_list_item(it->second);
+    p->write(s);
+    ++it;
+  }
+  int32_t r = p->serialize(data, size, flags);
+  if (r < 0)
+    return -1;
+  if (r > size)
+    return -1;
+  return r;
+}
+
+int32_t ResponseSerializer::serialize_monitor_list_add(AdapterInfo &info,
+                                                       void *data,
+                                                       uint32_t size,
+                                                       uint32_t flags) {
+  shared_ptr<Caps> p = Caps::new_instance();
+  shared_ptr<Caps> s;
+
+  p->write(CMD_MONITOR_RESP);
+  p->write(MONITOR_LIST_ADD);
+  s = serialize_monitor_list_item(info);
+  p->write(s);
+  int32_t r = p->serialize(data, size, flags);
+  if (r < 0)
+    return -1;
+  if (r > size)
+    return -1;
+  return r;
+}
+
+int32_t ResponseSerializer::serialize_monitor_list_remove(uint32_t id,
+                                                          void *data,
+                                                          uint32_t size,
+                                                          uint32_t flags) {
+  shared_ptr<Caps> p = Caps::new_instance();
+  p->write(CMD_MONITOR_RESP);
+  p->write(MONITOR_LIST_REMOVE);
+  p->write(id);
+  int32_t r = p->serialize(data, size, flags);
+  if (r < 0)
+    return -1;
+  if (r > size)
+    return -1;
+  return r;
+}
+
+int32_t ResponseSerializer::serialize_monitor_sub_all(AdapterInfoMap &infos,
+                                                      void *data, uint32_t size,
+                                                      uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_sub_add(uint32_t id,
+                                                      const string &name,
+                                                      void *data, uint32_t size,
+                                                      uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_sub_remove(uint32_t id,
+                                                         const string &name,
+                                                         void *data,
+                                                         uint32_t size,
+                                                         uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_decl_all(AdapterInfoMap &infos,
+                                                       void *data,
+                                                       uint32_t size,
+                                                       uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_decl_add(uint32_t id,
+                                                       const string &name,
+                                                       void *data,
+                                                       uint32_t size,
+                                                       uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_decl_remove(uint32_t id,
+                                                          const string &name,
+                                                          void *data,
+                                                          uint32_t size,
+                                                          uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_post(uint32_t from,
+                                                   const string &name,
+                                                   void *data, uint32_t size,
+                                                   uint32_t flags) {
+  return -1;
+}
+
+int32_t ResponseSerializer::serialize_monitor_call(
+    uint32_t from, const string &name, const string &target, int32_t err,
+    void *data, uint32_t size, uint32_t flags) {
+  return -1;
+}
+
 int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,
-                                  string &extra, int32_t &pid) {
+                                  string &extra, int32_t &pid,
+                                  uint32_t &flags) {
   if (caps->read(version) != CAPS_SUCCESS)
     return -1;
   if (caps->read(extra) != CAPS_SUCCESS)
     return -1;
-  if (caps->read(pid) != CAPS_SUCCESS) {
+  if (caps->read(pid) != CAPS_SUCCESS)
     pid = 0;
-  }
+  if (caps->read(flags) != CAPS_SUCCESS)
+    flags = 0;
   return 0;
 }
 
@@ -271,17 +400,7 @@ int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
   return 0;
 }
 
-int32_t ResponseParser::parse_auth(const void *data, uint32_t size,
-                                   int32_t &result) {
-  shared_ptr<Caps> caps;
-  int32_t cmd;
-
-  if (Caps::parse(data, size, caps) != CAPS_SUCCESS)
-    return -1;
-  if (caps->read(cmd) != CAPS_SUCCESS)
-    return -1;
-  if (cmd != CMD_AUTH_RESP)
-    return -1;
+int32_t ResponseParser::parse_auth(shared_ptr<Caps> &caps, int32_t &result) {
   if (caps->read(result) != CAPS_SUCCESS)
     return -1;
   return 0;
@@ -324,6 +443,100 @@ int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
       return -1;
   }
   return 0;
+}
+
+int32_t ResponseParser::parse_monitor_list_all(shared_ptr<Caps> &caps,
+                                               vector<MonitorListItem> &infos) {
+  uint32_t size;
+  if (caps->read(size) != CAPS_SUCCESS)
+    return -1;
+  if (size == 0)
+    return 0;
+
+  shared_ptr<Caps> sub;
+  infos.reserve(size);
+  while (true) {
+    if (caps->read(sub) != CAPS_SUCCESS)
+      break;
+    infos.emplace_back();
+    MonitorListItem &i = infos.back();
+    if (sub->read(i.id) != CAPS_SUCCESS)
+      return -1;
+    if (sub->read(i.pid) != CAPS_SUCCESS)
+      return -1;
+    if (sub->read(i.name) != CAPS_SUCCESS)
+      return -1;
+    if (sub->read(i.flags) != CAPS_SUCCESS)
+      return -1;
+  }
+  return infos.size() == size ? 0 : -1;
+}
+
+int32_t ResponseParser::parse_monitor_list_add(shared_ptr<Caps> &caps,
+                                               MonitorListItem &info) {
+  shared_ptr<Caps> sub;
+  if (caps->read(sub) != CAPS_SUCCESS)
+    return -1;
+  if (sub->read(info.id) != CAPS_SUCCESS)
+    return -1;
+  if (sub->read(info.pid) != CAPS_SUCCESS)
+    return -1;
+  if (sub->read(info.name) != CAPS_SUCCESS)
+    return -1;
+  if (sub->read(info.flags) != CAPS_SUCCESS)
+    return -1;
+  return 0;
+}
+
+int32_t ResponseParser::parse_monitor_list_remove(shared_ptr<Caps> &caps,
+                                                  uint32_t &id) {
+  if (caps->read(id) != CAPS_SUCCESS)
+    return -1;
+  return 0;
+}
+
+int32_t
+ResponseParser::parse_monitor_sub_all(shared_ptr<Caps> &caps,
+                                      vector<MonitorSubscriptionItem> &infos) {
+  return -1;
+}
+
+int32_t ResponseParser::parse_monitor_sub_add(shared_ptr<Caps> &caps,
+                                              MonitorSubscriptionItem &info) {
+  return -1;
+}
+
+int32_t
+ResponseParser::parse_monitor_sub_remove(shared_ptr<Caps> &caps,
+                                         MonitorSubscriptionItem &info) {
+  return -1;
+}
+
+int32_t
+ResponseParser::parse_monitor_decl_all(shared_ptr<Caps> &caps,
+                                       vector<MonitorDeclarationItem> &infos) {
+  return -1;
+}
+
+int32_t ResponseParser::parse_monitor_decl_add(shared_ptr<Caps> &caps,
+                                               MonitorDeclarationItem &info) {
+  return -1;
+}
+
+int32_t
+ResponseParser::parse_monitor_decl_remove(shared_ptr<Caps> &caps,
+                                          MonitorDeclarationItem &info) {
+  return -1;
+}
+
+int32_t ResponseParser::parse_monitor_post(shared_ptr<Caps> &caps,
+                                           MonitorPostInfo &info) {
+  return -1;
+}
+
+int32_t ResponseParser::parse_monitor_call(shared_ptr<Caps> &caps,
+                                           MonitorCallInfo &info) {
+  return -1;
 }
 
 bool is_valid_msgtype(uint32_t msgtype) {

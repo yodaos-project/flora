@@ -1,14 +1,13 @@
 #include "cli.h"
-#include "defs.h"
 #include "rlog.h"
 #include "ser-helper.h"
 #include "sock-conn.h"
 #include "uri.h"
 #include <assert.h>
+#include <signal.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <signal.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -17,8 +16,9 @@ using rokid::Uri;
 #define TAG "flora.Client"
 
 static bool ignore_sigpipe = false;
-int32_t flora::Client::connect(const char *uri, flora::ClientCallback *cb,
-                               uint32_t msg_buf_size,
+int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
+                               flora::MonitorCallback *mcb,
+                               uint32_t msg_buf_size, uint32_t flags,
                                shared_ptr<flora::Client> &result) {
   if (!ignore_sigpipe) {
     signal(SIGPIPE, SIG_IGN);
@@ -29,7 +29,7 @@ int32_t flora::Client::connect(const char *uri, flora::ClientCallback *cb,
       msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
   shared_ptr<flora::internal::Client> cli =
       make_shared<flora::internal::Client>(bufsize);
-  int32_t r = cli->connect(uri, cb);
+  int32_t r = cli->connect(uri, flags, ccb, mcb);
   if (r != FLORA_CLI_SUCCESS)
     return r;
   cli->set_weak_ptr(cli);
@@ -37,8 +37,29 @@ int32_t flora::Client::connect(const char *uri, flora::ClientCallback *cb,
   return r;
 }
 
+int32_t flora::Client::connect(const char *uri, ClientCallback *cb,
+                               uint32_t msg_buf_size,
+                               shared_ptr<flora::Client> &result) {
+  return flora::Client::connect(uri, cb, nullptr, msg_buf_size, 0, result);
+}
+
+int32_t flora::Client::connect(const char *uri, MonitorCallback *cb,
+                               uint32_t msg_buf_size, uint32_t flags,
+                               shared_ptr<flora::Client> &result) {
+  flags |= FLORA_CLI_FLAG_MONITOR;
+  return flora::Client::connect(uri, nullptr, cb, msg_buf_size, flags, result);
+}
+
 namespace flora {
 namespace internal {
+
+Client::MonitorHandler Client::monitor_handlers[] = {
+    &Client::handle_monitor_list_all,    &Client::handle_monitor_list_add,
+    &Client::handle_monitor_list_remove, &Client::handle_monitor_sub_all,
+    &Client::handle_monitor_sub_add,     &Client::handle_monitor_sub_remove,
+    &Client::handle_monitor_decl_all,    &Client::handle_monitor_decl_add,
+    &Client::handle_monitor_decl_remove, &Client::handle_monitor_post,
+    &Client::handle_monitor_call};
 
 Client::Client(uint32_t bufsize) : buf_size(bufsize) {
   sbuffer = (int8_t *)mmap(NULL, buf_size * 2, PROT_READ | PROT_WRITE,
@@ -58,7 +79,8 @@ Client::~Client() noexcept {
 #endif
 }
 
-int32_t Client::connect(const char *uri, ClientCallback *cb) {
+int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
+                        MonitorCallback *mcb) {
   if (uri == nullptr)
     return FLORA_CLI_EINVAL;
 
@@ -90,37 +112,39 @@ int32_t Client::connect(const char *uri, ClientCallback *cb) {
     delete conn;
     return FLORA_CLI_EINVAL;
   }
-  int32_t r = auth(urip.fragment);
+  recv_thread = thread([this]() { this->recv_loop(); });
+  int32_t r = auth(urip.fragment, flags);
   if (r != FLORA_CLI_SUCCESS) {
     close(false);
     return r;
   }
-  callback = cb;
+  cli_callback = ccb;
+  mon_callback = mcb;
   auth_extra = urip.fragment;
-
-  recv_thread = thread([this]() { this->recv_loop(); });
+  this->flags = flags;
   return FLORA_CLI_SUCCESS;
 }
 
-int32_t Client::auth(const string &extra) {
-  int32_t c =
-      RequestSerializer::serialize_auth(FLORA_VERSION, extra.c_str(), getpid(),
-                                        sbuffer, buf_size, serialize_flags);
+int32_t Client::auth(const string &extra, uint32_t flags) {
+  int32_t c = RequestSerializer::serialize_auth(FLORA_VERSION, extra.c_str(),
+                                                getpid(), flags, sbuffer,
+                                                buf_size, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EAUTH;
-  if (!connection->send(sbuffer, c))
+  AuthResult ares;
+  unique_lock<mutex> locker(ares.amutex);
+  auth_result = &ares;
+  if (!connection->send(sbuffer, c)) {
+    auth_result = nullptr;
     return FLORA_CLI_EAUTH;
+  }
 #ifdef FLORA_DEBUG
   ++send_times;
   send_bytes += c;
 #endif
-  c = connection->recv(rbuffer, buf_size);
-  if (c <= 0)
-    return FLORA_CLI_EAUTH;
-  int32_t auth_res;
-  if (ResponseParser::parse_auth(rbuffer, c, auth_res) != 0)
-    return FLORA_CLI_EAUTH;
-  return auth_res;
+  ares.acond.wait(locker);
+  auth_result = nullptr;
+  return ares.result;
 }
 
 void Client::recv_loop() {
@@ -135,7 +159,15 @@ void Client::recv_loop() {
     }
     int32_t c = connection->recv(rbuffer + rbuf_off, buf_size - rbuf_off);
     if (c <= 0) {
-      err = FLORA_CLI_ECONN;
+      if (auth_result != nullptr) {
+        err = FLORA_CLI_EAUTH;
+        auth_result->amutex.lock();
+        auth_result->acond.notify_one();
+        auth_result->amutex.unlock();
+        auth_result = nullptr;
+      } else {
+        err = FLORA_CLI_ECONN;
+      }
       break;
     }
     if (!handle_received(rbuf_off + c)) {
@@ -167,83 +199,116 @@ bool Client::handle_received(int32_t size) {
     if (resp->read(cmd) != CAPS_SUCCESS) {
       return false;
     }
-    switch (cmd) {
-    case CMD_POST_RESP: {
-      uint32_t msgtype;
-      string name;
-      shared_ptr<Caps> args;
-
-      if (ResponseParser::parse_post(resp, name, msgtype, args) != 0) {
-        return false;
-      }
-      if (callback) {
-        callback->recv_post(name.c_str(), msgtype, args);
-      }
-      break;
-    }
-    case CMD_CALL_RESP: {
-      string name;
-      int32_t msgid;
-      shared_ptr<Caps> args;
-      if (ResponseParser::parse_call(resp, name, args, msgid) != 0) {
-        return false;
-      }
-      if (callback) {
-        shared_ptr<Reply> reply =
-            make_shared<ReplyImpl>(this_weak_ptr.lock(), msgid);
-        callback->recv_call(name.c_str(), args, reply);
-      }
-      break;
-    }
-    case CMD_REPLY_RESP: {
-      string name;
-      int32_t msgid;
-      int32_t rescode;
-      PendingRequestList::iterator it;
-      Response response;
-
-      if (ResponseParser::parse_reply(resp, msgid, rescode, response) != 0) {
-        KLOGW(TAG, "parse reply failed");
-        return false;
-      }
-
-      req_mutex.lock();
-      for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
-        if ((*it).id == msgid) {
-          if ((*it).result) {
-            (*it).id = 0;
-            (*it).rcode = rescode;
-            if (rescode == FLORA_CLI_SUCCESS) {
-              (*it).result->ret_code = response.ret_code;
-              (*it).result->data = response.data;
-              (*it).result->extra = response.extra;
-            }
-            req_reply_cond.notify_all();
-          } else {
-            if (rescode != FLORA_CLI_SUCCESS) {
-              response.ret_code = 0;
-            }
-            auto cb = (*it).callback;
-            pending_requests.erase(it);
-            req_mutex.unlock();
-            cb(rescode, response);
-            req_mutex.lock();
-          }
-          break;
-        }
-      }
-      req_mutex.unlock();
-      break;
-    }
-    default:
-      KLOGE(TAG, "client received invalid command %d", cmd);
+    if (!(this->*cmd_handler)(cmd, resp))
       return false;
-    }
   }
   if (off > 0 && size - off > 0) {
     memmove(rbuffer, rbuffer + off, size - off);
   }
   rbuf_off = size - off;
+  return true;
+}
+
+bool Client::handle_cmd_before_auth(int32_t cmd, shared_ptr<Caps> &resp) {
+  if (cmd != CMD_AUTH_RESP)
+    return false;
+  lock_guard<mutex> locker(auth_result->amutex);
+  if (ResponseParser::parse_auth(resp, auth_result->result) < 0)
+    return false;
+  auth_result->acond.notify_one();
+  cmd_handler = &Client::handle_cmd_after_auth;
+  return true;
+}
+
+bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
+  switch (cmd) {
+  case CMD_POST_RESP: {
+    uint32_t msgtype;
+    string name;
+    shared_ptr<Caps> args;
+
+    if (ResponseParser::parse_post(resp, name, msgtype, args) != 0) {
+      return false;
+    }
+    if (cli_callback) {
+      cli_callback->recv_post(name.c_str(), msgtype, args);
+    }
+    break;
+  }
+  case CMD_CALL_RESP: {
+    string name;
+    int32_t msgid;
+    shared_ptr<Caps> args;
+    if (ResponseParser::parse_call(resp, name, args, msgid) != 0) {
+      return false;
+    }
+    if (cli_callback) {
+      shared_ptr<Reply> reply =
+          make_shared<ReplyImpl>(this_weak_ptr.lock(), msgid);
+      cli_callback->recv_call(name.c_str(), args, reply);
+    }
+    break;
+  }
+  case CMD_REPLY_RESP: {
+    string name;
+    int32_t msgid;
+    int32_t rescode;
+    PendingRequestList::iterator it;
+    Response response;
+
+    if (ResponseParser::parse_reply(resp, msgid, rescode, response) != 0) {
+      KLOGW(TAG, "parse reply failed");
+      return false;
+    }
+
+    req_mutex.lock();
+    for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
+      if ((*it).id == msgid) {
+        if ((*it).result) {
+          (*it).id = 0;
+          (*it).rcode = rescode;
+          if (rescode == FLORA_CLI_SUCCESS) {
+            (*it).result->ret_code = response.ret_code;
+            (*it).result->data = response.data;
+            (*it).result->extra = response.extra;
+          }
+          req_reply_cond.notify_all();
+        } else {
+          if (rescode != FLORA_CLI_SUCCESS) {
+            response.ret_code = 0;
+          }
+          auto cb = (*it).callback;
+          pending_requests.erase(it);
+          req_mutex.unlock();
+          cb(rescode, response);
+          req_mutex.lock();
+        }
+        break;
+      }
+    }
+    req_mutex.unlock();
+    break;
+  }
+  case CMD_MONITOR_RESP: {
+    if (mon_callback == nullptr)
+      break;
+    uint32_t subtype;
+    if (resp->read(subtype) != CAPS_SUCCESS) {
+      KLOGW(TAG, "parse monitor resp failed");
+      return false;
+    }
+    if (subtype >= MONITOR_SUBTYPE_NUM) {
+      KLOGW(TAG, "parse monitor resp failed: invalid subtype %u", subtype);
+      return false;
+    }
+    if (!(this->*monitor_handlers[subtype])(resp))
+      return false;
+    break;
+  }
+  default:
+    KLOGE(TAG, "client received invalid command %d", cmd);
+    return false;
+  }
   return true;
 }
 
@@ -270,8 +335,11 @@ void Client::iclose(bool passive, int32_t err) {
   }
   req_mutex.unlock();
 
-  if (passive && callback) {
-    callback->disconnected();
+  if (passive) {
+    if (cli_callback)
+      cli_callback->disconnected();
+    if (mon_callback)
+      mon_callback->disconnected();
   }
 }
 
@@ -281,6 +349,7 @@ int32_t Client::close(bool passive) {
   iclose(passive, FLORA_CLI_ECLOSED);
   if (recv_thread.joinable())
     recv_thread.join();
+  cmd_handler = &Client::handle_cmd_before_auth;
   return FLORA_CLI_SUCCESS;
 }
 
@@ -296,6 +365,8 @@ void Client::send_reply(int32_t callid, int32_t code,
 int32_t Client::subscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_subscribe(name, sbuffer, buf_size,
                                                      serialize_flags);
   if (c <= 0)
@@ -313,6 +384,8 @@ int32_t Client::subscribe(const char *name) {
 int32_t Client::unsubscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_unsubscribe(name, sbuffer, buf_size,
                                                        serialize_flags);
   if (c <= 0)
@@ -330,6 +403,8 @@ int32_t Client::unsubscribe(const char *name) {
 int32_t Client::declare_method(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_declare_method(
       name, sbuffer, buf_size, serialize_flags);
   if (c <= 0)
@@ -347,6 +422,8 @@ int32_t Client::declare_method(const char *name) {
 int32_t Client::remove_method(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_remove_method(
       name, sbuffer, buf_size, serialize_flags);
   if (c <= 0)
@@ -365,6 +442,8 @@ int32_t Client::post(const char *name, shared_ptr<Caps> &msg,
                      uint32_t msgtype) {
   if (name == nullptr || !is_valid_msgtype(msgtype))
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_post(name, msgtype, msg, sbuffer,
                                                 buf_size, serialize_flags);
   if (c <= 0)
@@ -385,6 +464,8 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      const char *target, Response &reply, uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   if (this_thread::get_id() == callback_thr_id)
     return FLORA_CLI_EDEADLOCK;
   int32_t c = RequestSerializer::serialize_call(
@@ -436,6 +517,8 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
+  if (flags & FLORA_CLI_FLAG_MONITOR)
+    return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_call(
       name, msg, target, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
   if (c <= 0)
@@ -466,6 +549,116 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      function<void(int32_t, Response &)> &&cb,
                      uint32_t timeout) {
   return call(name, msg, target, cb, timeout);
+}
+
+bool Client::handle_monitor_list_all(shared_ptr<Caps> &resp) {
+  vector<MonitorListItem> items;
+  if (ResponseParser::parse_monitor_list_all(resp, items) < 0) {
+    KLOGW(TAG, "parse monitor list all failed: invalid data");
+    return false;
+  }
+  mon_callback->list_all(items);
+  return true;
+}
+
+bool Client::handle_monitor_list_add(shared_ptr<Caps> &resp) {
+  MonitorListItem item;
+  if (ResponseParser::parse_monitor_list_add(resp, item) < 0) {
+    KLOGW(TAG, "parse monitor list add failed: invalid data");
+    return false;
+  }
+  mon_callback->list_add(item);
+  return true;
+}
+
+bool Client::handle_monitor_list_remove(shared_ptr<Caps> &resp) {
+  uint32_t id;
+  if (ResponseParser::parse_monitor_list_remove(resp, id) < 0) {
+    KLOGW(TAG, "parse monitor list remove failed: invalid data");
+    return false;
+  }
+  mon_callback->list_remove(id);
+  return true;
+}
+
+bool Client::handle_monitor_sub_all(shared_ptr<Caps> &resp) {
+  vector<MonitorSubscriptionItem> items;
+  if (ResponseParser::parse_monitor_sub_all(resp, items) < 0) {
+    KLOGW(TAG, "parse monitor sub all failed: invalid data");
+    return false;
+  }
+  mon_callback->sub_all(items);
+  return true;
+}
+
+bool Client::handle_monitor_sub_add(shared_ptr<Caps> &resp) {
+  MonitorSubscriptionItem item;
+  if (ResponseParser::parse_monitor_sub_add(resp, item) < 0) {
+    KLOGW(TAG, "parse monitor sub add failed: invalid data");
+    return false;
+  }
+  mon_callback->sub_add(item);
+  return true;
+}
+
+bool Client::handle_monitor_sub_remove(shared_ptr<Caps> &resp) {
+  MonitorSubscriptionItem item;
+  if (ResponseParser::parse_monitor_sub_remove(resp, item) < 0) {
+    KLOGW(TAG, "parse monitor sub remove failed: invalid data");
+    return false;
+  }
+  mon_callback->sub_remove(item);
+  return true;
+}
+
+bool Client::handle_monitor_decl_all(shared_ptr<Caps> &resp) {
+  vector<MonitorDeclarationItem> items;
+  if (ResponseParser::parse_monitor_decl_all(resp, items) < 0) {
+    KLOGW(TAG, "parse monitor decl all failed: invalid data");
+    return false;
+  }
+  mon_callback->decl_all(items);
+  return true;
+}
+
+bool Client::handle_monitor_decl_add(shared_ptr<Caps> &resp) {
+  MonitorDeclarationItem item;
+  if (ResponseParser::parse_monitor_decl_add(resp, item) < 0) {
+    KLOGW(TAG, "parse monitor decl add failed: invalid data");
+    return false;
+  }
+  mon_callback->decl_add(item);
+  return true;
+}
+
+bool Client::handle_monitor_decl_remove(shared_ptr<Caps> &resp) {
+  MonitorDeclarationItem item;
+  if (ResponseParser::parse_monitor_decl_remove(resp, item) < 0) {
+    KLOGW(TAG, "parse monitor decl remove failed: invalid data");
+    return false;
+  }
+  mon_callback->decl_remove(item);
+  return true;
+}
+
+bool Client::handle_monitor_post(shared_ptr<Caps> &resp) {
+  MonitorPostInfo info;
+  if (ResponseParser::parse_monitor_post(resp, info) < 0) {
+    KLOGW(TAG, "parse monitor post failed: invalid data");
+    return false;
+  }
+  mon_callback->post(info);
+  return true;
+}
+
+bool Client::handle_monitor_call(shared_ptr<Caps> &resp) {
+  MonitorCallInfo info;
+  if (ResponseParser::parse_monitor_call(resp, info) < 0) {
+    KLOGW(TAG, "parse monitor call failed: invalid data");
+    return false;
+  }
+  mon_callback->call(info);
+  return true;
 }
 
 ReplyImpl::ReplyImpl(shared_ptr<Client> &&c, int32_t id)
@@ -562,7 +755,7 @@ int32_t flora_cli_connect(const char *uri, flora_cli_callback_t *cb, void *arg,
     wcb->arg = arg;
   }
 
-  r = cli->connect(uri, wcb);
+  r = cli->connect(uri, 0, wcb, nullptr);
   if (r != FLORA_CLI_SUCCESS) {
     return r;
   }
@@ -577,8 +770,8 @@ void flora_cli_delete(flora_cli_t handle) {
   if (handle) {
     CClient *cli = reinterpret_cast<CClient *>(handle);
     cli->cxxclient->close(false);
-    if (cli->cxxclient->callback)
-      delete cli->cxxclient->callback;
+    if (cli->cxxclient->cli_callback)
+      delete cli->cxxclient->cli_callback;
     delete cli;
   }
 }

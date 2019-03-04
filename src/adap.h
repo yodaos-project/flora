@@ -9,6 +9,31 @@ typedef struct {
   uint32_t size;
 } Frame;
 
+class AdapterInfo {
+public:
+  AdapterInfo() { id = ++idseq; }
+
+  uint32_t id;
+  int32_t pid = 0;
+  std::string name;
+  std::set<std::string> declared_methods;
+  uint32_t flags = 0;
+
+  static uint32_t idseq;
+
+public:
+  bool declare_method(const std::string &name) {
+    auto r = declared_methods.insert(name);
+    return r.second;
+  }
+
+  void remove_method(const std::string &name) { declared_methods.erase(name); }
+
+  bool has_method(const std::string &name) {
+    return declared_methods.find(name) != declared_methods.end();
+  }
+};
+
 class Adapter {
 public:
   Adapter(uint32_t flags) : serialize_flags(flags) {}
@@ -25,23 +50,9 @@ public:
 
   virtual bool closed() = 0;
 
-  bool declare_method(const std::string &name) {
-    auto r = declared_methods.insert(name);
-    return r.second;
-  }
-
-  void remove_method(const std::string &name) { declared_methods.erase(name); }
-
-  bool has_method(const std::string &name) {
-    return declared_methods.find(name) != declared_methods.end();
-  }
-
-private:
-  std::set<std::string> declared_methods;
-
 public:
-  std::string auth_extra;
-  uint32_t serialize_flags = 0;
+  uint32_t serialize_flags;
+  AdapterInfo *info = nullptr;
 #ifdef FLORA_DEBUG
   uint32_t recv_times = 0;
   uint32_t recv_bytes = 0;

@@ -20,10 +20,6 @@ SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
 
 SocketAdapter::~SocketAdapter() {
   close();
-#ifdef FLORA_DEBUG
-  KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
-        auth_extra.c_str(), recv_times, recv_bytes);
-#endif
 }
 
 int32_t SocketAdapter::read() {
@@ -31,10 +27,11 @@ int32_t SocketAdapter::read() {
     return SOCK_ADAPTER_ECLOSED;
   ssize_t c = ::read(socket, buffer + cur_size, buf_size - cur_size);
   if (c <= 0) {
-    if (c == 0)
-      KLOGE(TAG, "socket closed by remote");
-    else
+    if (c == 0) {
+      KLOGD(TAG, "socket closed by remote");
+    } else {
       KLOGE(TAG, "read socket failed: %s", strerror(errno));
+    }
     close();
     return SOCK_ADAPTER_ECLOSED;
   }
@@ -87,6 +84,10 @@ void SocketAdapter::close_nolock() {
     munmap(buffer, buf_size);
     buffer = nullptr;
     socket = -1;
+#ifdef FLORA_DEBUG
+    KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
+          info ? info->name.c_str() : "", recv_times, recv_bytes);
+#endif
   }
 }
 

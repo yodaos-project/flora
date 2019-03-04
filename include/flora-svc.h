@@ -8,6 +8,8 @@
 #define FLORA_POLL_INVAL -3
 #define FLORA_POLL_UNSUPP -4
 
+#define FLORA_DISP_FLAG_MONITOR 1
+
 #ifdef __cplusplus
 #include <memory>
 
@@ -21,7 +23,8 @@ public:
 
   virtual void close() = 0;
 
-  static std::shared_ptr<Dispatcher> new_instance(uint32_t msg_buf_size = 0);
+  static std::shared_ptr<Dispatcher> new_instance(uint32_t flags = 0,
+                                                  uint32_t msg_buf_size = 0);
 };
 
 class Poll {
@@ -48,7 +51,7 @@ typedef void (*flora_received_func_t)(flora_dispatcher_t handle,
 // --flora dispatcher functions--
 // 消息转发
 
-flora_dispatcher_t flora_dispatcher_new(uint32_t msg_buf_size);
+flora_dispatcher_t flora_dispatcher_new(uint32_t flags, uint32_t msg_buf_size);
 
 void flora_dispatcher_delete(flora_dispatcher_t handle);
 

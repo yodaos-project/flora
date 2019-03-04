@@ -27,6 +27,8 @@ void DemoAllInOne::start_service() {
 void DemoAllInOne::stop_service() {
   dispatcher->close();
   poll->stop();
+  poll.reset();
+  dispatcher.reset();
 }
 
 void DemoAllInOne::run_start_stop_service() {
@@ -327,6 +329,8 @@ void DemoAllInOne::test_reply_after_close() {
   int32_t r = agent.call("foo", empty_arg, targetName, resp, 100);
   if (r != FLORA_CLI_ETIMEOUT) {
     KLOGE(TAG, "agent call should timeout, but %d", r);
+    agent.close();
+    stop_service();
     return;
   }
 
@@ -338,6 +342,8 @@ void DemoAllInOne::test_reply_after_close() {
                  1000);
   if (r != FLORA_CLI_SUCCESS) {
     KLOGE(TAG, "agent call failed: %d", r);
+    agent.close();
+    stop_service();
     return;
   }
   usleep(200000);
@@ -355,6 +361,8 @@ void DemoAllInOne::test_reply_after_close() {
                       500);
   if (r != FLORA_CLI_SUCCESS) {
     KLOGE(TAG, "agent call failed: %d", r);
+    agent.close();
+    stop_service();
     return;
   }
   usleep(200000);
@@ -381,11 +389,11 @@ void DemoAllInOne::test_invoke_in_callback() {
     int32_t r = agent.call("not-exists", empty, "blah", resp);
     KLOGI(TAG, "invoke 'call' in callback function, return %d, excepted %d", r,
           FLORA_CLI_EDEADLOCK);
-    r = agent.call("not-exists", empty, "blah", [](int32_t code, Response &) {
+    r = agent.call("not-exists", empty, "blah", [&agent](int32_t code, Response &) {
       KLOGI(TAG, "invoke async 'call' in callback, return %d, excepted %d",
             code, FLORA_CLI_ENEXISTS);
+      agent.close();
     });
-    agent.close();
   });
   agent.start();
   shared_ptr<Caps> empty;

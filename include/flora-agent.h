@@ -12,9 +12,15 @@
  * 更易用的消息回调
  */
 
+// config(KEY, string uri)
 #define FLORA_AGENT_CONFIG_URI 0
+// config(KEY, uint32_t bufsize)
 #define FLORA_AGENT_CONFIG_BUFSIZE 1
+// config(KEY, uint32_t interval)
 #define FLORA_AGENT_CONFIG_RECONN_INTERVAL 2
+// config(KEY, uint32_t flags, MonitorCallback *cb)
+//   flags: FLORA_CLI_FLAG_MONITOR_*  (see flora-cli.h)
+#define FLORA_AGENT_CONFIG_MONITOR 3
 
 #ifdef __cplusplus
 
@@ -85,14 +91,22 @@ public:
 private:
   void run();
 
-  void subscribe_msgs(std::shared_ptr<Client> &cli);
+  void init_cli(std::shared_ptr<Client> &cli);
 
   void destroy_client();
 
 private:
-  std::string uri;
-  uint32_t bufsize = 0;
-  std::chrono::milliseconds reconn_interval = std::chrono::milliseconds(10000);
+  class Options {
+  public:
+    std::string uri;
+    uint32_t bufsize = 0;
+    std::chrono::milliseconds reconn_interval =
+        std::chrono::milliseconds(10000);
+    uint32_t flags = 0;
+    MonitorCallback *mon_callback = nullptr;
+  };
+
+  Options options;
   PostHandlerMap post_handlers;
   CallHandlerMap call_handlers;
   std::mutex conn_mutex;

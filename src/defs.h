@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLORA_VERSION 2
+#define FLORA_VERSION 3
 
 // client --> server
 #define CMD_AUTH_REQ 0
@@ -16,8 +16,23 @@
 #define CMD_POST_RESP 102
 #define CMD_REPLY_RESP 103
 #define CMD_CALL_RESP 104
+#define CMD_MONITOR_RESP 105
 
 #define MSG_HANDLER_COUNT 8
+
+// subtype of CMD_MONITOR_RESP
+#define MONITOR_LIST_ALL 0
+#define MONITOR_LIST_ADD 1
+#define MONITOR_LIST_REMOVE 2
+#define MONITOR_SUB_ALL 3
+#define MONITOR_SUB_ADD 4
+#define MONITOR_SUB_REMOVE 5
+#define MONITOR_DECL_ALL 6
+#define MONITOR_DECL_ADD 7
+#define MONITOR_DECL_REMOVE 8
+#define MONITOR_POST 9
+#define MONITOR_CALL 10
+#define MONITOR_SUBTYPE_NUM 11
 
 #define DEFAULT_MSG_BUF_SIZE 32768
 

@@ -32,6 +32,8 @@ SocketPoll::SocketPoll(const std::string &host, int32_t port) {
   type = POLL_TYPE_TCP;
 }
 
+SocketPoll::~SocketPoll() { stop(); }
+
 int32_t SocketPoll::start(shared_ptr<flora::Dispatcher> &disp) {
   unique_lock<mutex> locker(start_mutex);
   if (dispatcher.get())
@@ -152,6 +154,7 @@ void SocketPoll::run() {
       if (FD_ISSET(adap_it->first, &rfds)) {
         KLOGD(TAG, "read from fd %d", adap_it->first);
         if (!read_from_client(adap_it->second)) {
+          adap_it->second->close();
           dispatcher->erase_adapter(
               static_pointer_cast<Adapter>(adap_it->second));
           pending_delete_adapters.push_back(adap_it->first);

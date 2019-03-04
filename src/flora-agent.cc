@@ -23,13 +23,19 @@ void Agent::config(uint32_t key, ...) {
 void Agent::config(uint32_t key, va_list ap) {
   switch (key) {
   case FLORA_AGENT_CONFIG_URI:
-    uri = va_arg(ap, const char *);
+    options.uri = va_arg(ap, const char *);
     break;
   case FLORA_AGENT_CONFIG_BUFSIZE:
-    bufsize = va_arg(ap, uint32_t);
+    options.bufsize = va_arg(ap, uint32_t);
     break;
   case FLORA_AGENT_CONFIG_RECONN_INTERVAL:
-    reconn_interval = milliseconds(va_arg(ap, uint32_t));
+    options.reconn_interval = milliseconds(va_arg(ap, uint32_t));
+    break;
+  case FLORA_AGENT_CONFIG_MONITOR:
+    options.flags = va_arg(ap, uint32_t);
+    if (options.flags & FLORA_CLI_FLAG_MONITOR) {
+      options.mon_callback = va_arg(ap, MonitorCallback *);
+    }
     break;
   }
 }
@@ -112,16 +118,17 @@ void Agent::run() {
   shared_ptr<Client> cli;
 
   while (working) {
-    int32_t r = Client::connect(uri.c_str(), this, bufsize, cli);
+    int32_t r = Client::connect(options.uri.c_str(), this, options.mon_callback,
+                                options.bufsize, options.flags, cli);
     if (r != FLORA_CLI_SUCCESS) {
       KLOGI(TAG,
             "connect to flora service %s failed, retry after %u milliseconds",
-            uri.c_str(), reconn_interval.count());
+            options.uri.c_str(), options.reconn_interval.count());
       start_cond.notify_one();
-      conn_cond.wait_for(locker, reconn_interval);
+      conn_cond.wait_for(locker, options.reconn_interval);
     } else {
-      KLOGI(TAG, "flora service %s connected", uri.c_str());
-      subscribe_msgs(cli);
+      KLOGI(TAG, "flora service %s connected", options.uri.c_str());
+      init_cli(cli);
       flora_cli = cli;
       start_cond.notify_one();
       conn_cond.wait(locker);
@@ -129,7 +136,7 @@ void Agent::run() {
   }
 }
 
-void Agent::subscribe_msgs(shared_ptr<Client> &cli) {
+void Agent::init_cli(shared_ptr<Client> &cli) {
   PostHandlerMap::iterator pit;
   CallHandlerMap::iterator cit;
 
@@ -248,9 +255,7 @@ void Agent::recv_call(const char *name, shared_ptr<Caps> &msg,
   }
 }
 
-void Agent::disconnected() {
-  destroy_client();
-}
+void Agent::disconnected() { destroy_client(); }
 
 } // namespace flora
 
