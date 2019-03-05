@@ -112,14 +112,15 @@ int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
     delete conn;
     return FLORA_CLI_EINVAL;
   }
+  mon_callback = mcb;
   recv_thread = thread([this]() { this->recv_loop(); });
   int32_t r = auth(urip.fragment, flags);
   if (r != FLORA_CLI_SUCCESS) {
+    mon_callback = nullptr;
     close(false);
     return r;
   }
   cli_callback = ccb;
-  mon_callback = mcb;
   auth_extra = urip.fragment;
   this->flags = flags;
   return FLORA_CLI_SUCCESS;
