@@ -131,6 +131,16 @@ int32_t RequestSerializer::serialize_reply(int32_t id, int32_t code,
   return r;
 }
 
+int32_t RequestSerializer::serialize_ping(void *data, uint32_t size,
+                                          uint32_t flags) {
+  shared_ptr<Caps> caps = Caps::new_instance();
+  caps->write(CMD_PING_REQ);
+  int32_t r = caps->serialize(data, size, flags);
+  if (r < 0 || r > size)
+    return -1;
+  return r;
+}
+
 int32_t ResponseSerializer::serialize_auth(int32_t result, void *data,
                                            uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
@@ -320,6 +330,16 @@ int32_t ResponseSerializer::serialize_monitor_call(
     uint32_t from, const string &name, const string &target, int32_t err,
     void *data, uint32_t size, uint32_t flags) {
   return -1;
+}
+
+int32_t ResponseSerializer::serialize_pong(void *data, uint32_t size,
+                                           uint32_t flags) {
+  shared_ptr<Caps> p = Caps::new_instance();
+  p->write(CMD_PONG_RESP);
+  int32_t r = p->serialize(data, size, flags);
+  if (r < 0 || r > size)
+    return -1;
+  return r;
 }
 
 int32_t RequestParser::parse_auth(shared_ptr<Caps> &caps, uint32_t &version,

@@ -33,11 +33,13 @@ public:
 
   bool closed() override;
 
+  int socket() const { return socketfd; }
+
 private:
   void close_nolock();
 
 private:
-  int socket;
+  int socketfd;
   int8_t *buffer = nullptr;
   uint32_t buf_size;
   uint32_t cur_size = 0;

@@ -11,14 +11,16 @@
 #define CMD_DECLARE_METHOD_REQ 5
 #define CMD_REMOVE_METHOD_REQ 6
 #define CMD_CALL_REQ 7
+#define CMD_PING_REQ 8
 // server --> client
 #define CMD_AUTH_RESP 101
 #define CMD_POST_RESP 102
 #define CMD_REPLY_RESP 103
 #define CMD_CALL_RESP 104
 #define CMD_MONITOR_RESP 105
+#define CMD_PONG_RESP 106
 
-#define MSG_HANDLER_COUNT 8
+#define MSG_HANDLER_COUNT 9
 
 // subtype of CMD_MONITOR_RESP
 #define MONITOR_LIST_ALL 0
@@ -39,3 +41,5 @@
 #ifdef __APPLE__
 #define SELECT_BLOCK_IF_FD_CLOSED
 #endif
+
+#define TAG "flora"

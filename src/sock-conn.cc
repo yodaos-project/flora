@@ -1,4 +1,5 @@
 #include "sock-conn.h"
+#include "defs.h"
 #include "rlog.h"
 #include <arpa/inet.h>
 #include <chrono>
@@ -13,7 +14,7 @@
 
 using namespace std;
 
-#define TAG "flora.SocketConn"
+SocketConn::SocketConn(uint32_t rtmo) : recv_timeout(rtmo) {}
 
 SocketConn::~SocketConn() {
   if (sock >= 0) {
@@ -26,6 +27,13 @@ bool SocketConn::connect(const std::string &name) {
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
     return false;
+  }
+  // set socket recv timeout
+  if (recv_timeout > 0) {
+    struct timeval tv;
+    tv.tv_sec = recv_timeout / 1000;
+    tv.tv_usec = (recv_timeout % 1000) * 1000;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   }
   struct sockaddr_un addr;
   memset(&addr, 0, sizeof(addr));
@@ -46,6 +54,13 @@ bool SocketConn::connect(const std::string &host, int32_t port) {
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
     return false;
+  }
+  // set socket recv timeout
+  if (recv_timeout > 0) {
+    struct timeval tv;
+    tv.tv_sec = recv_timeout / 1000;
+    tv.tv_usec = (recv_timeout % 1000) * 1000;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   }
   struct sockaddr_in addr;
   struct hostent *hp;
@@ -95,6 +110,8 @@ int32_t SocketConn::recv(void *data, uint32_t size) {
   do {
     c = ::read(sock, data, size);
     if (c < 0) {
+      if (errno == EAGAIN)
+        return -2;
       if (errno == EINTR) {
         KLOGE(TAG, "read socket failed: %s", strerror(errno));
         continue;

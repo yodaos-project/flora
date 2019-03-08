@@ -389,11 +389,12 @@ void DemoAllInOne::test_invoke_in_callback() {
     int32_t r = agent.call("not-exists", empty, "blah", resp);
     KLOGI(TAG, "invoke 'call' in callback function, return %d, excepted %d", r,
           FLORA_CLI_EDEADLOCK);
-    r = agent.call("not-exists", empty, "blah", [&agent](int32_t code, Response &) {
-      KLOGI(TAG, "invoke async 'call' in callback, return %d, excepted %d",
-            code, FLORA_CLI_ENEXISTS);
-      agent.close();
-    });
+    r = agent.call(
+        "not-exists", empty, "blah", [&agent](int32_t code, Response &) {
+          KLOGI(TAG, "invoke async 'call' in callback, return %d, excepted %d",
+                code, FLORA_CLI_ENEXISTS);
+          agent.close();
+        });
   });
   agent.start();
   shared_ptr<Caps> empty;

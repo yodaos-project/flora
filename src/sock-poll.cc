@@ -13,7 +13,6 @@
 
 using namespace std;
 
-#define TAG "flora.UnixPoll"
 #define POLL_TYPE_UNIX 0
 #define POLL_TYPE_TCP 1
 
@@ -104,13 +103,8 @@ static int tcp_accept(int lfd) {
 }
 
 void SocketPoll::run() {
-  fd_set all_fds;
   fd_set rfds;
-  int new_fd;
-  int max_fd;
-  AdapterMap::iterator adap_it;
-  vector<int> pending_delete_adapters;
-  size_t i;
+  int ifd;
 
   start_mutex.lock();
   FD_ZERO(&all_fds);
@@ -133,46 +127,51 @@ void SocketPoll::run() {
     // select timeout, this Poll not closed, continue
     if (r == 0)
       continue;
-    // accept new connection
-    if (FD_ISSET(lfd, &rfds)) {
-      if (type == POLL_TYPE_TCP)
-        new_fd = tcp_accept(lfd);
-      else
-        new_fd = unix_accept(lfd);
-      if (new_fd < 0) {
-        KLOGE(TAG, "accept failed: %s", strerror(errno));
-        continue;
-      }
-      if (new_fd >= max_fd)
-        max_fd = new_fd + 1;
-      FD_SET(new_fd, &all_fds);
-      KLOGI(TAG, "accept new connection %d", new_fd);
-      new_adapter(new_fd);
-    }
-    // read
-    for (adap_it = adapters.begin(); adap_it != adapters.end(); ++adap_it) {
-      if (FD_ISSET(adap_it->first, &rfds)) {
-        KLOGD(TAG, "read from fd %d", adap_it->first);
-        if (!read_from_client(adap_it->second)) {
-          adap_it->second->close();
-          dispatcher->erase_adapter(
-              static_pointer_cast<Adapter>(adap_it->second));
-          pending_delete_adapters.push_back(adap_it->first);
-          FD_CLR(adap_it->first, &all_fds);
+    for (ifd = 0; ifd < max_fd; ++ifd) {
+      if (FD_ISSET(ifd, &rfds)) {
+        if (ifd == lfd) {
+          auto new_adap = do_accept(lfd);
+          if (new_adap == nullptr) {
+            KLOGE(TAG, "accept failed: %s", strerror(errno));
+            continue;
+          }
+          KLOGI(TAG, "accept new connection %d",
+                static_pointer_cast<SocketAdapter>(new_adap)->socket());
+        } else {
+          auto it = adapters.find(ifd);
+          if (it != adapters.end()) {
+            KLOGD(TAG, "read from fd %d", ifd);
+            if (!do_read(it->second)) {
+              delete_adapter(it->second);
+              adapters.erase(it);
+            }
+          }
         }
       }
     }
-    for (i = 0; i < pending_delete_adapters.size(); ++i) {
-      delete_adapter(pending_delete_adapters[i]);
-    }
-    pending_delete_adapters.clear();
   }
 
   // release resources
   while (adapters.size() > 0) {
-    delete_adapter(adapters.begin()->first);
+    auto it = adapters.begin();
+    delete_adapter(it->second);
+    adapters.erase(it);
   }
   KLOGI(TAG, "unix poll: run thread quit");
+}
+
+shared_ptr<Adapter> SocketPoll::do_accept(int lfd) {
+  int new_fd = -1;
+
+  if (type == POLL_TYPE_TCP)
+    new_fd = tcp_accept(lfd);
+  else
+    new_fd = unix_accept(lfd);
+  if (new_fd < 0)
+    return nullptr;
+  auto adap = new_adapter(new_fd);
+  adapters.insert(make_pair(new_fd, adap));
+  return adap;
 }
 
 bool SocketPoll::init_unix_socket() {
@@ -223,22 +222,24 @@ bool SocketPoll::init_tcp_socket() {
   return true;
 }
 
-void SocketPoll::new_adapter(int fd) {
+shared_ptr<Adapter> SocketPoll::new_adapter(int fd) {
   shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(
       fd, max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0);
-  adapters.insert(make_pair(fd, adap));
+  if (fd >= max_fd)
+    max_fd = fd + 1;
+  FD_SET(fd, &all_fds);
+  return static_pointer_cast<Adapter>(adap);
 }
 
-void SocketPoll::delete_adapter(int fd) {
-  AdapterMap::iterator it = adapters.find(fd);
-  if (it != adapters.end()) {
-    ::close(fd);
-    it->second->close();
-    adapters.erase(it);
-  }
+void SocketPoll::delete_adapter(shared_ptr<Adapter> &adap) {
+  dispatcher->erase_adapter(adap);
+  int fd = static_pointer_cast<SocketAdapter>(adap)->socket();
+  adap->close();
+  FD_CLR(fd, &all_fds);
+  ::close(fd);
 }
 
-bool SocketPoll::read_from_client(shared_ptr<SocketAdapter> &adap) {
+bool SocketPoll::do_read(shared_ptr<Adapter> &adap) {
   int32_t r = adap->read();
   if (r != SOCK_ADAPTER_SUCCESS)
     return false;
@@ -247,8 +248,7 @@ bool SocketPoll::read_from_client(shared_ptr<SocketAdapter> &adap) {
   while (true) {
     r = adap->next_frame(frame);
     if (r == SOCK_ADAPTER_SUCCESS) {
-      shared_ptr<Adapter> a = static_pointer_cast<Adapter>(adap);
-      if (!dispatcher->put(frame.data, frame.size, a)) {
+      if (!dispatcher->put(frame.data, frame.size, adap)) {
         KLOGE(TAG, "dispatcher put failed");
         return false;
       }
