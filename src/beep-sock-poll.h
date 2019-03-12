@@ -5,7 +5,9 @@
 #include "sock-poll.h"
 #include <chrono>
 #include <memory>
+#include <errno.h>
 #include <stdarg.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
