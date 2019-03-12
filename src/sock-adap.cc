@@ -79,7 +79,6 @@ void SocketAdapter::close_nolock() {
   if (buffer) {
     munmap(buffer, buf_size);
     buffer = nullptr;
-    socketfd = -1;
 #ifdef FLORA_DEBUG
     KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
           info ? info->name.c_str() : "", recv_times, recv_bytes);
