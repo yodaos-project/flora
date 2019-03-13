@@ -27,12 +27,11 @@ typedef std::list<PendingRequest> PendingRequestList;
 
 class Client : public flora::Client {
 public:
-  explicit Client(uint32_t bufsize);
+  explicit Client(flora::ClientOptions *opts);
 
   ~Client() noexcept;
 
-  int32_t connect(const char *uri, uint32_t flags, ClientCallback *ccb,
-                  MonitorCallback *mcb);
+  int32_t connect(const char *uri, ClientCallback *ccb, MonitorCallback *mcb);
 
   int32_t close(bool passive);
 
@@ -65,6 +64,8 @@ private:
 
   void recv_loop();
 
+  void keepalive_loop();
+
   bool handle_received(int32_t size);
 
   bool handle_cmd_before_auth(int32_t cmd, std::shared_ptr<Caps> &resp);
@@ -85,26 +86,29 @@ private:
   bool handle_monitor_post(std::shared_ptr<Caps> &resp);
   bool handle_monitor_call(std::shared_ptr<Caps> &resp);
 
+  void ping();
+
 private:
-  uint32_t buf_size;
   int8_t *sbuffer = nullptr;
   int8_t *rbuffer = nullptr;
   uint32_t rbuf_off = 0;
+  ClientOptions options;
   std::shared_ptr<Connection> connection;
   std::thread recv_thread;
   std::mutex req_mutex;
   std::condition_variable req_reply_cond;
   PendingRequestList pending_requests;
+  std::thread keepalive_thread;
+  std::mutex ka_mutex;
+  std::condition_variable ka_cond;
   int32_t reqseq = 0;
   uint32_t serialize_flags = 0;
   int32_t close_reason = 0;
   std::weak_ptr<Client> this_weak_ptr;
   std::thread::id callback_thr_id;
-  // client flags
-  //   MONITOR
-  uint32_t flags = 0;
   MonitorCallback *mon_callback = nullptr;
-  typedef bool (flora::internal::Client::*CmdHandler)(int32_t cmd, std::shared_ptr<Caps> &resp);
+  typedef bool (flora::internal::Client::*CmdHandler)(
+      int32_t cmd, std::shared_ptr<Caps> &resp);
   CmdHandler cmd_handler = &Client::handle_cmd_before_auth;
   class AuthResult {
   public:

@@ -13,23 +13,24 @@ using namespace std;
 using namespace std::chrono;
 using rokid::Uri;
 
-#define TAG "flora.Client"
-
 static bool ignore_sigpipe = false;
 int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
                                flora::MonitorCallback *mcb,
-                               uint32_t msg_buf_size, uint32_t flags,
+                               flora::ClientOptions *opts,
                                shared_ptr<flora::Client> &result) {
   if (!ignore_sigpipe) {
     signal(SIGPIPE, SIG_IGN);
     ignore_sigpipe = true;
   }
 
-  uint32_t bufsize =
-      msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
+  ClientOptions defopts;
+  if (opts == nullptr)
+    opts = &defopts;
+  if (opts->bufsize < DEFAULT_MSG_BUF_SIZE)
+    opts->bufsize = DEFAULT_MSG_BUF_SIZE;
   shared_ptr<flora::internal::Client> cli =
-      make_shared<flora::internal::Client>(bufsize);
-  int32_t r = cli->connect(uri, flags, ccb, mcb);
+      make_shared<flora::internal::Client>(opts);
+  int32_t r = cli->connect(uri, ccb, mcb);
   if (r != FLORA_CLI_SUCCESS)
     return r;
   cli->set_weak_ptr(cli);
@@ -40,14 +41,9 @@ int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
 int32_t flora::Client::connect(const char *uri, ClientCallback *cb,
                                uint32_t msg_buf_size,
                                shared_ptr<flora::Client> &result) {
-  return flora::Client::connect(uri, cb, nullptr, msg_buf_size, 0, result);
-}
-
-int32_t flora::Client::connect(const char *uri, MonitorCallback *cb,
-                               uint32_t msg_buf_size, uint32_t flags,
-                               shared_ptr<flora::Client> &result) {
-  flags |= FLORA_CLI_FLAG_MONITOR;
-  return flora::Client::connect(uri, nullptr, cb, msg_buf_size, flags, result);
+  flora::ClientOptions opts;
+  opts.bufsize = msg_buf_size;
+  return flora::Client::connect(uri, cb, nullptr, &opts, result);
 }
 
 namespace flora {
@@ -61,16 +57,16 @@ Client::MonitorHandler Client::monitor_handlers[] = {
     &Client::handle_monitor_decl_remove, &Client::handle_monitor_post,
     &Client::handle_monitor_call};
 
-Client::Client(uint32_t bufsize) : buf_size(bufsize) {
-  sbuffer = (int8_t *)mmap(NULL, buf_size * 2, PROT_READ | PROT_WRITE,
+Client::Client(flora::ClientOptions *opts) : options(*opts) {
+  sbuffer = (int8_t *)mmap(NULL, options.bufsize * 2, PROT_READ | PROT_WRITE,
                            MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-  rbuffer = sbuffer + buf_size;
+  rbuffer = sbuffer + options.bufsize;
 }
 
 Client::~Client() noexcept {
   close(false);
 
-  munmap(sbuffer, buf_size * 2);
+  munmap(sbuffer, options.bufsize * 2);
 #ifdef FLORA_DEBUG
   KLOGI(TAG,
         "client %s: post %u times, post %u bytes, "
@@ -79,7 +75,7 @@ Client::~Client() noexcept {
 #endif
 }
 
-int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
+int32_t Client::connect(const char *uri, ClientCallback *ccb,
                         MonitorCallback *mcb) {
   if (uri == nullptr)
     return FLORA_CLI_EINVAL;
@@ -92,8 +88,9 @@ int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
   KLOGI(TAG, "uri parse: path = %s", urip.path.c_str());
   KLOGI(TAG, "uri parse: fragment = %s", urip.fragment.c_str());
 
-  SocketConn *conn = new SocketConn();
+  SocketConn *conn = nullptr;
   if (urip.scheme == "unix") {
+    conn = new SocketConn(0);
     if (!conn->connect(urip.path)) {
       delete conn;
       return FLORA_CLI_ECONN;
@@ -101,6 +98,7 @@ int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
     connection.reset(conn);
     serialize_flags = 0;
   } else if (urip.scheme == "tcp") {
+    conn = new SocketConn(options.noresp_timeout);
     if (!conn->connect(urip.host, urip.port)) {
       delete conn;
       return FLORA_CLI_ECONN;
@@ -109,27 +107,26 @@ int32_t Client::connect(const char *uri, uint32_t flags, ClientCallback *ccb,
     serialize_flags = CAPS_FLAG_NET_BYTEORDER;
   } else {
     KLOGE(TAG, "unsupported uri scheme %s", urip.scheme.c_str());
-    delete conn;
     return FLORA_CLI_EINVAL;
   }
   mon_callback = mcb;
   recv_thread = thread([this]() { this->recv_loop(); });
-  int32_t r = auth(urip.fragment, flags);
+  int32_t r = auth(urip.fragment, options.flags);
   if (r != FLORA_CLI_SUCCESS) {
     mon_callback = nullptr;
     close(false);
     return r;
   }
+  keepalive_thread = thread([this]() { this->keepalive_loop(); });
   cli_callback = ccb;
   auth_extra = urip.fragment;
-  this->flags = flags;
   return FLORA_CLI_SUCCESS;
 }
 
 int32_t Client::auth(const string &extra, uint32_t flags) {
-  int32_t c = RequestSerializer::serialize_auth(FLORA_VERSION, extra.c_str(),
-                                                getpid(), flags, sbuffer,
-                                                buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_auth(
+      FLORA_VERSION, extra.c_str(), getpid(), flags, sbuffer, options.bufsize,
+      serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EAUTH;
   AuthResult ares;
@@ -153,12 +150,13 @@ void Client::recv_loop() {
 
   callback_thr_id = this_thread::get_id();
   while (true) {
-    if (rbuf_off == buf_size) {
-      KLOGW(TAG, "recv buffer not enough, %u bytes", buf_size);
+    if (rbuf_off == options.bufsize) {
+      KLOGW(TAG, "recv buffer not enough, %u bytes", options.bufsize);
       err = FLORA_CLI_EINSUFF_BUF;
       break;
     }
-    int32_t c = connection->recv(rbuffer + rbuf_off, buf_size - rbuf_off);
+    int32_t c =
+        connection->recv(rbuffer + rbuf_off, options.bufsize - rbuf_off);
     if (c <= 0) {
       if (auth_result != nullptr) {
         err = FLORA_CLI_EAUTH;
@@ -167,6 +165,9 @@ void Client::recv_loop() {
         auth_result->amutex.unlock();
         auth_result = nullptr;
       } else {
+        if (c == -2) {
+          KLOGW(TAG, "wait flora service response timeout");
+        }
         err = FLORA_CLI_ECONN;
       }
       break;
@@ -306,11 +307,35 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
       return false;
     break;
   }
+  case CMD_PONG_RESP:
+    KLOGD(TAG, "recv pong");
+    break;
   default:
     KLOGE(TAG, "client received invalid command %d", cmd);
     return false;
   }
   return true;
+}
+
+void Client::keepalive_loop() {
+  unique_lock<mutex> locker(ka_mutex);
+  milliseconds inter(options.beep_interval);
+
+  while (true) {
+    // connection CANNOT be nullptr here
+    if (connection->closed())
+      break;
+    if (ka_cond.wait_for(locker, inter) == cv_status::timeout)
+      ping();
+  }
+}
+
+void Client::ping() {
+  int32_t c = RequestSerializer::serialize_ping(sbuffer, options.bufsize,
+                                                serialize_flags);
+  if (c <= 0)
+    return;
+  connection->send(sbuffer, c);
 }
 
 void Client::iclose(bool passive, int32_t err) {
@@ -336,6 +361,10 @@ void Client::iclose(bool passive, int32_t err) {
   }
   req_mutex.unlock();
 
+  ka_mutex.lock();
+  ka_cond.notify_one();
+  ka_mutex.unlock();
+
   if (passive) {
     if (cli_callback)
       cli_callback->disconnected();
@@ -351,13 +380,15 @@ int32_t Client::close(bool passive) {
   if (recv_thread.joinable())
     recv_thread.join();
   cmd_handler = &Client::handle_cmd_before_auth;
+  if (keepalive_thread.joinable())
+    keepalive_thread.join();
   return FLORA_CLI_SUCCESS;
 }
 
 void Client::send_reply(int32_t callid, int32_t code,
                         std::shared_ptr<Caps> &data) {
-  int32_t c = RequestSerializer::serialize_reply(callid, code, data, sbuffer,
-                                                 buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_reply(
+      callid, code, data, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return;
   connection->send(sbuffer, c);
@@ -366,10 +397,10 @@ void Client::send_reply(int32_t callid, int32_t code,
 int32_t Client::subscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
-  int32_t c = RequestSerializer::serialize_subscribe(name, sbuffer, buf_size,
-                                                     serialize_flags);
+  int32_t c = RequestSerializer::serialize_subscribe(
+      name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   if (!connection->send(sbuffer, c)) {
@@ -385,10 +416,10 @@ int32_t Client::subscribe(const char *name) {
 int32_t Client::unsubscribe(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
-  int32_t c = RequestSerializer::serialize_unsubscribe(name, sbuffer, buf_size,
-                                                       serialize_flags);
+  int32_t c = RequestSerializer::serialize_unsubscribe(
+      name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   if (!connection->send(sbuffer, c)) {
@@ -404,10 +435,10 @@ int32_t Client::unsubscribe(const char *name) {
 int32_t Client::declare_method(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_declare_method(
-      name, sbuffer, buf_size, serialize_flags);
+      name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   if (!connection->send(sbuffer, c)) {
@@ -423,10 +454,10 @@ int32_t Client::declare_method(const char *name) {
 int32_t Client::remove_method(const char *name) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_remove_method(
-      name, sbuffer, buf_size, serialize_flags);
+      name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   if (!connection->send(sbuffer, c)) {
@@ -443,10 +474,10 @@ int32_t Client::post(const char *name, shared_ptr<Caps> &msg,
                      uint32_t msgtype) {
   if (name == nullptr || !is_valid_msgtype(msgtype))
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
-  int32_t c = RequestSerializer::serialize_post(name, msgtype, msg, sbuffer,
-                                                buf_size, serialize_flags);
+  int32_t c = RequestSerializer::serialize_post(
+      name, msgtype, msg, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
   if (!connection->send(sbuffer, c)) {
@@ -465,12 +496,13 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      const char *target, Response &reply, uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
   if (this_thread::get_id() == callback_thr_id)
     return FLORA_CLI_EDEADLOCK;
   int32_t c = RequestSerializer::serialize_call(
-      name, msg, target, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
+      name, msg, target, ++reqseq, timeout, sbuffer, options.bufsize,
+      serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
 
@@ -518,10 +550,11 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
                      uint32_t timeout) {
   if (name == nullptr)
     return FLORA_CLI_EINVAL;
-  if (flags & FLORA_CLI_FLAG_MONITOR)
+  if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
   int32_t c = RequestSerializer::serialize_call(
-      name, msg, target, ++reqseq, timeout, sbuffer, buf_size, serialize_flags);
+      name, msg, target, ++reqseq, timeout, sbuffer, options.bufsize,
+      serialize_flags);
   if (c <= 0)
     return FLORA_CLI_EINVAL;
 
@@ -744,9 +777,12 @@ int32_t flora_cli_connect(const char *uri, flora_cli_callback_t *cb, void *arg,
   if (result == nullptr)
     return FLORA_CLI_EINVAL;
 
-  uint32_t bufsize =
-      msg_buf_size > DEFAULT_MSG_BUF_SIZE ? msg_buf_size : DEFAULT_MSG_BUF_SIZE;
-  shared_ptr<Client> cli = make_shared<Client>(bufsize);
+  flora::ClientOptions opts;
+  if (msg_buf_size < DEFAULT_MSG_BUF_SIZE)
+    opts.bufsize = DEFAULT_MSG_BUF_SIZE;
+  else
+    opts.bufsize = msg_buf_size;
+  shared_ptr<Client> cli = make_shared<Client>(&opts);
   int32_t r;
 
   WrapClientCallback *wcb = nullptr;
@@ -756,7 +792,7 @@ int32_t flora_cli_connect(const char *uri, flora_cli_callback_t *cb, void *arg,
     wcb->arg = arg;
   }
 
-  r = cli->connect(uri, 0, wcb, nullptr);
+  r = cli->connect(uri, wcb, nullptr);
   if (r != FLORA_CLI_SUCCESS) {
     return r;
   }

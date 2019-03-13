@@ -40,6 +40,8 @@ public:
   static int32_t serialize_reply(int32_t id, int32_t code,
                                  std::shared_ptr<Caps> &values, void *data,
                                  uint32_t size, uint32_t flags);
+
+  static int32_t serialize_ping(void *data, uint32_t size, uint32_t flags);
 };
 
 class ResponseSerializer {
@@ -99,6 +101,8 @@ public:
                                         const std::string &target, int32_t err,
                                         void *data, uint32_t size,
                                         uint32_t flags);
+
+  static int32_t serialize_pong(void *data, uint32_t size, uint32_t flags);
 };
 
 class RequestParser {

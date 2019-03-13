@@ -40,6 +40,10 @@
 #define FLORA_CLI_FLAG_MONITOR_DETAIL_DECL 0x4
 #define FLORA_CLI_FLAG_MONITOR_DETAIL_POST 0x8
 #define FLORA_CLI_FLAG_MONITOR_DETAIL_CALL 0x10
+#define FLORA_CLI_FLAG_KEEPALIVE 0x20
+
+#define FLORA_CLI_DEFAULT_BEEP_INTERVAL 50000
+#define FLORA_CLI_DEFAULT_NORESP_TIMEOUT 100000
 
 namespace flora {
 
@@ -67,6 +71,15 @@ public:
 
 class ClientCallback;
 class MonitorCallback;
+
+class ClientOptions {
+public:
+  uint32_t bufsize = 0;
+  uint32_t flags = 0;
+  // effective when FLORA_CLI_FLAG_KEEPALIVE is set
+  uint32_t beep_interval = FLORA_CLI_DEFAULT_BEEP_INTERVAL;
+  uint32_t noresp_timeout = FLORA_CLI_DEFAULT_NORESP_TIMEOUT;
+};
 
 class Client {
 public:
@@ -101,13 +114,9 @@ public:
                          uint32_t msg_buf_size,
                          std::shared_ptr<Client> &result);
 
-  static int32_t connect(const char *uri, MonitorCallback *cb,
-                         uint32_t msg_buf_size, uint32_t flags,
-                         std::shared_ptr<Client> &result);
-
   static int32_t connect(const char *uri, ClientCallback *ccb,
-                         MonitorCallback *mcb, uint32_t msg_buf_size,
-                         uint32_t flags, std::shared_ptr<Client> &result);
+                         MonitorCallback *mcb, ClientOptions *opts,
+                         std::shared_ptr<Client> &result);
 };
 
 class ClientCallback {
@@ -290,6 +299,16 @@ int32_t flora_cli_connect(const char *uri, flora_cli_callback_t *callback,
 int32_t flora_cli_connect2(const char *uri,
                            flora_cli_monitor_callback_t *callback, void *arg,
                            uint32_t msg_buf_size, flora_cli_t *result);
+
+typedef struct {
+  uint32_t bufsize;
+  uint32_t flags;
+  uint32_t beep_interval;
+  uint32_t noresp_timeout;
+} flora_cli_options;
+int32_t flora_cli_connect3(const char *uri, flora_cli_callback_t *ccb,
+                           flora_cli_monitor_callback_t *mcb, void *arg,
+                           flora_cli_options *opts, flora_cli_t *result);
 
 void flora_cli_delete(flora_cli_t handle);
 

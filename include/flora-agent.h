@@ -21,6 +21,10 @@
 // config(KEY, uint32_t flags, MonitorCallback *cb)
 //   flags: FLORA_CLI_FLAG_MONITOR_*  (see flora-cli.h)
 #define FLORA_AGENT_CONFIG_MONITOR 3
+// config(KEY, uint32_t interval, uint32_t timeout)
+//   interval: interval of send beep packet
+//   timeout: timeout of flora service no response
+#define FLORA_AGENT_CONFIG_KEEPALIVE 4
 
 #ifdef __cplusplus
 
@@ -104,6 +108,8 @@ private:
         std::chrono::milliseconds(10000);
     uint32_t flags = 0;
     MonitorCallback *mon_callback = nullptr;
+    uint32_t beep_interval = FLORA_CLI_DEFAULT_BEEP_INTERVAL;
+    uint32_t noresp_timeout = FLORA_CLI_DEFAULT_NORESP_TIMEOUT;
   };
 
   Options options;

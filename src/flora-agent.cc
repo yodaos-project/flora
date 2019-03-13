@@ -4,8 +4,6 @@
 #include <string.h>
 #include <thread>
 
-#define TAG "flora.agent"
-
 using namespace std;
 using namespace std::chrono;
 
@@ -36,6 +34,10 @@ void Agent::config(uint32_t key, va_list ap) {
     if (options.flags & FLORA_CLI_FLAG_MONITOR) {
       options.mon_callback = va_arg(ap, MonitorCallback *);
     }
+    break;
+  case FLORA_AGENT_CONFIG_KEEPALIVE:
+    options.beep_interval = va_arg(ap, uint32_t);
+    options.noresp_timeout = va_arg(ap, uint32_t);
     break;
   }
 }
@@ -116,10 +118,15 @@ void Agent::start(bool block) {
 void Agent::run() {
   unique_lock<mutex> locker(conn_mutex);
   shared_ptr<Client> cli;
+  flora::ClientOptions cliopts;
 
+  cliopts.bufsize = options.bufsize;
+  cliopts.flags = options.flags;
+  cliopts.beep_interval = options.beep_interval;
+  cliopts.noresp_timeout = options.noresp_timeout;
   while (working) {
     int32_t r = Client::connect(options.uri.c_str(), this, options.mon_callback,
-                                options.bufsize, options.flags, cli);
+                                &cliopts, cli);
     if (r != FLORA_CLI_SUCCESS) {
       KLOGI(TAG,
             "connect to flora service %s failed, retry after %u milliseconds",
