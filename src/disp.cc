@@ -10,7 +10,6 @@
 using namespace std;
 using namespace std::chrono;
 
-#define TAG "flora.Dispatcher"
 #define DEFAULT_CALL_TIMEOUT 200
 
 uint32_t AdapterInfo::idseq;
@@ -23,7 +22,9 @@ bool (Dispatcher::*(Dispatcher::msg_handlers[MSG_HANDLER_COUNT]))(
     &Dispatcher::handle_auth_req,        &Dispatcher::handle_subscribe_req,
     &Dispatcher::handle_unsubscribe_req, &Dispatcher::handle_post_req,
     &Dispatcher::handle_reply_req,       &Dispatcher::handle_declare_method,
-    &Dispatcher::handle_remove_method,   &Dispatcher::handle_call_req};
+    &Dispatcher::handle_remove_method,   &Dispatcher::handle_call_req,
+    &Dispatcher::handle_ping_req,
+};
 
 Dispatcher::Dispatcher(uint32_t f, uint32_t bufsize) : flags(f) {
   buf_size = bufsize > DEFAULT_MSG_BUF_SIZE ? bufsize : DEFAULT_MSG_BUF_SIZE;
@@ -104,8 +105,7 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
     do_erase_adapter(sender);
     return;
   }
-  if (sender->info &&
-      (sender->info->flags & FLORA_CLI_FLAG_MONITOR)) {
+  if (sender->info && (sender->info->flags & FLORA_CLI_FLAG_MONITOR)) {
     // monitor client should not send request
     sender->close();
     return;
@@ -155,7 +155,7 @@ void Dispatcher::close() {
   }
 }
 
-void Dispatcher::erase_adapter(shared_ptr<Adapter> &&adapter) {
+void Dispatcher::erase_adapter(shared_ptr<Adapter> &adapter) {
   if (adapter->info == nullptr)
     return;
   lock_guard<mutex> locker(cmd_mutex);
@@ -218,6 +218,8 @@ void Dispatcher::do_erase_adapter(shared_ptr<Adapter> &sender) {
   if (sender->info->flags & FLORA_CLI_FLAG_MONITOR)
     monitors.erase(reinterpret_cast<intptr_t>(sender.get()));
   else {
+    KLOGI(TAG, "erase adapter <%d>:%s", sender->info->pid,
+          sender->info->name.c_str());
     write_monitor_list_remove(sender->info->id);
     adapter_infos.erase(reinterpret_cast<intptr_t>(sender.get()));
   }
@@ -481,6 +483,20 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
   return true;
 }
 
+bool Dispatcher::handle_ping_req(shared_ptr<Caps> &msg_caps,
+                                 shared_ptr<Adapter> &sender) {
+  if (sender->info == nullptr)
+    return false;
+  KLOGD(TAG, "<<< %s: ping", sender->info->name.c_str());
+  int32_t c = ResponseSerializer::serialize_pong(buffer, buf_size,
+                                                 sender->serialize_flags);
+  if (c < 0)
+    return false;
+  KLOGD(TAG, ">>> %s: pong", sender->info->name.c_str());
+  sender->write(buffer, c);
+  return true;
+}
+
 bool Dispatcher::add_adapter(const string &name, int32_t pid, uint32_t flags,
                              shared_ptr<Adapter> &adapter) {
   if (name.length() > 0) {
@@ -538,8 +554,8 @@ void Dispatcher::write_monitor_list_add(shared_ptr<Adapter> &newitem,
       *newitem->info, buffer, buf_size, monitor->serialize_flags);
   if (c < 0)
     return;
-  KLOGD(TAG, ">>> %s: monitor list add %s, %d bytes", monitor->info->name.c_str(),
-        newitem->info->name.c_str(), c);
+  KLOGD(TAG, ">>> %s: monitor list add %s, %d bytes",
+        monitor->info->name.c_str(), newitem->info->name.c_str(), c);
   monitor->write(buffer, c);
 }
 

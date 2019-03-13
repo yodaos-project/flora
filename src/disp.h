@@ -49,7 +49,7 @@ public:
 
   inline uint32_t max_msg_size() const { return buf_size; }
 
-  void erase_adapter(std::shared_ptr<Adapter> &&adapter);
+  void erase_adapter(std::shared_ptr<Adapter> &adapter);
 
 private:
   bool handle_auth_req(std::shared_ptr<Caps> &msg_caps,
@@ -75,6 +75,9 @@ private:
 
   bool handle_reply_req(std::shared_ptr<Caps> &msg_caps,
                         std::shared_ptr<Adapter> &sender);
+
+  bool handle_ping_req(std::shared_ptr<Caps> &msg_caps,
+                       std::shared_ptr<Adapter> &sender);
 
   bool add_adapter(const std::string &name, int32_t pid, uint32_t flags,
                    std::shared_ptr<Adapter> &adapter);

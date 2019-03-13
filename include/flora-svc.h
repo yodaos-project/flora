@@ -8,6 +8,9 @@
 #define FLORA_POLL_INVAL -3
 #define FLORA_POLL_UNSUPP -4
 
+// options of 'config'
+#define FLORA_POLL_OPT_KEEPALIVE_TIMEOUT 1
+
 #define FLORA_DISP_FLAG_MONITOR 1
 
 #ifdef __cplusplus
@@ -34,6 +37,8 @@ public:
   virtual int32_t start(std::shared_ptr<Dispatcher> &dispathcer) = 0;
 
   virtual void stop() = 0;
+
+  virtual void config(uint32_t opt, ...) = 0;
 
   static std::shared_ptr<Poll> new_instance(const char *uri);
 };

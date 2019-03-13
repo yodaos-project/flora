@@ -11,12 +11,10 @@
 #include <sys/select.h>
 #include <thread>
 
-typedef std::map<int, std::shared_ptr<SocketAdapter>> AdapterMap;
-// typedef std::list<std::shared_ptr<Session> > SessionList;
-// typedef std::map<std::string, SessionList> SubscribeMap;
-
 namespace flora {
 namespace internal {
+
+typedef std::map<int, std::shared_ptr<Adapter>> AdapterMap;
 
 class SocketPoll : public flora::Poll {
 public:
@@ -30,6 +28,15 @@ public:
 
   void stop();
 
+  virtual void config(uint32_t opt, ...) {}
+
+protected:
+  virtual int32_t do_poll(fd_set *rfds, int max_fd);
+
+  virtual std::shared_ptr<Adapter> do_accept(int lfd);
+
+  virtual bool do_read(std::shared_ptr<Adapter> &adap);
+
 private:
   void run();
 
@@ -37,19 +44,17 @@ private:
 
   bool init_tcp_socket();
 
-  void new_adapter(int fd);
-
-  void delete_adapter(int fd);
-
-  bool read_from_client(std::shared_ptr<SocketAdapter> &adap);
-
   int get_listen_fd();
 
-  int32_t do_poll(fd_set *rfds, int max_fd);
+  std::shared_ptr<Adapter> new_adapter(int fd);
+
+  void delete_adapter(std::shared_ptr<Adapter> &adap);
 
 private:
   std::shared_ptr<Dispatcher> dispatcher;
   int listen_fd = -1;
+  int max_fd = 0;
+  fd_set all_fds;
   uint32_t max_msg_size = 0;
   std::thread run_thread;
   std::mutex start_mutex;

@@ -88,6 +88,7 @@ set(flora_svc_SOURCES
   src/poll.cc
   src/sock-poll.h
   src/sock-poll.cc
+  src/beep-sock-poll.h
   src/disp.h
   src/disp.cc
   src/ser-helper.h

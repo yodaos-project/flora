@@ -1,5 +1,5 @@
+#include "beep-sock-poll.h"
 #include "flora-svc.h"
-#include "sock-poll.h"
 #include "uri.h"
 
 using namespace std;
@@ -14,7 +14,7 @@ shared_ptr<flora::Poll> flora::Poll::new_instance(const char *uri) {
         make_shared<flora::internal::SocketPoll>(urip.path));
   } else if (urip.scheme == "tcp") {
     return static_pointer_cast<flora::Poll>(
-        make_shared<flora::internal::SocketPoll>(urip.host, urip.port));
+        make_shared<flora::internal::BeepSocketPoll>(urip.host, urip.port));
   }
   return nullptr;
 }
