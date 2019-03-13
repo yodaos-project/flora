@@ -76,7 +76,7 @@ class ClientOptions {
 public:
   uint32_t bufsize = 0;
   uint32_t flags = 0;
-  // has effects when FLORA_CLI_FLAG_KEEPALIVE is set
+  // effective when FLORA_CLI_FLAG_KEEPALIVE is set
   uint32_t beep_interval = FLORA_CLI_DEFAULT_BEEP_INTERVAL;
   uint32_t noresp_timeout = FLORA_CLI_DEFAULT_NORESP_TIMEOUT;
 };
