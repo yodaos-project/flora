@@ -46,6 +46,7 @@ bool Dispatcher::put(const void *data, uint32_t size,
     return false;
   }
 
+  KLOGI(TAG, "put, awake handle_cmds thread");
   cmd_mutex.lock();
   cmd_packets.push_back(make_pair(msg_caps, sender));
   cmd_cond.notify_one();
@@ -77,6 +78,7 @@ void Dispatcher::handle_cmds() {
       break;
     }
     pending_cmds.splice(pending_cmds.begin(), cmd_packets);
+    KLOGI(TAG, "handle_cmds: pending cmds count %d, pending calls %d", pending_cmds.size(), pending_calls.size());
     if (pending_cmds.empty()) {
       discard_pending_calls();
       if (pending_calls.empty()) {
@@ -101,10 +103,12 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
                             shared_ptr<Adapter> &sender) {
   // empty caps msg, erase adapter
   if (msg_caps == nullptr) {
+    KLOGI(TAG, "handle_cmds: before erase adapter");
     if (sender->auth_extra.length() > 0) {
       named_adapters.erase(sender->auth_extra);
     }
     erase_adapter_debug_info(sender);
+    KLOGI(TAG, "handle_cmds: after erase adapter");
     return;
   }
 
@@ -119,8 +123,12 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
     sender->close();
     return;
   }
-  if (!(this->*(msg_handlers[cmd]))(msg_caps, sender))
+  KLOGI(TAG, "handle_cmds: %d", cmd);
+  if (!(this->*(msg_handlers[cmd]))(msg_caps, sender)) {
+    KLOGI(TAG, "handle_cmds: %d, error", cmd);
     sender->close();
+  }
+  KLOGI(TAG, "handle_cmds: %d, done", cmd);
 }
 
 void Dispatcher::pending_call_timeout(PendingCall &pc) {
@@ -153,6 +161,7 @@ void Dispatcher::close() {
 }
 
 void Dispatcher::erase_adapter(shared_ptr<Adapter> &&adapter) {
+  KLOGI(TAG, "erase_adapter, awake handle_cmds thread");
   lock_guard<mutex> locker(cmd_mutex);
   shared_ptr<Caps> empty;
   // add empty caps to queue for erase adapter
