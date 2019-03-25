@@ -9,11 +9,10 @@ LOCAL_SRC_FILES := \
 	src/cli.h \
 	src/cli.cc \
 	src/conn.h \
-	src/tcp-conn.h \
-	src/tcp-conn.cc \
-	src/unix-conn.h \
-	src/unix-conn.cc \
+	src/sock-conn.h \
+	src/sock-conn.cc \
 	src/defs.h \
+	src/flora-agent.cc \
 	src/ser-helper.h \
 	src/ser-helper.cc
 LOCAL_C_INCLUDES := \
