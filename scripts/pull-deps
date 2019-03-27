@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -e
+
+help="
+"
+
+repo=""
+ref=""
+dest=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo)
+      repo="$2"
+      shift
+      ;;
+    --ref)
+      ref="$2"
+      shift
+      ;;
+    --dest)
+      dest="$2"
+      shift
+      ;;
+    -h|--help)
+      printf "$help"
+      exit
+      ;;
+    --*)
+      echo "Illegal option $1"
+      ;;
+  esac
+  shift $(( $# > 0 ? 1 : 0 ))
+done
+
+work_dir=/tmp
+echo "Fetching $repo source codes on ref $ref"
+archive_url="https://github.com/$repo/archive/$ref.tar.gz"
+
+arvhice_path="$work_dir/${repo/\//-}-$ref.tar.gz"
+curl -sLo "$arvhice_path" "$archive_url"
+tar -C "$work_dir" -xzf "$arvhice_path"
+rm -f "$arvhice_path"
+
+rm -rf "$dest"
+mv "$work_dir/${repo//*\//}-$ref" "$dest"
