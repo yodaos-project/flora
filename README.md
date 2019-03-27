@@ -1,5 +1,7 @@
 # flora
 
+[![Build Status](https://travis-ci.com/yodaos-project/flora.svg?branch=master)](https://travis-ci.com/yodaos-project/flora)
+
 作者: chen.zhang@rokid.com
 
 版本: 1
