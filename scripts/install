@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -ex
+
+scripts/pull-deps --repo Rokid/aife-mutils --ref master --dest deps/mutils
+scripts/pull-deps --repo Rokid/aife-cmake-modules --ref master --dest deps/cmake-modules

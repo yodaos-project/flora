@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -ex
+
+test_build=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --test)
+      test_build=true
+      shift
+      ;;
+    -h|--help)
+      printf "$help"
+      exit
+      ;;
+    --*)
+      echo "Illegal option $1"
+      ;;
+  esac
+  shift $(( $# > 0 ? 1 : 0 ))
+done
+
+project_dir=$(pwd)
+
+cd deps/mutils
+build_dir="$project_dir/out/build/mutils"
+./config \
+  --build-dir="$build_dir" \
+  --cmake-modules="$project_dir/deps/cmake-modules" \
+  --prefix="$project_dir/out/usr"
+cd $build_dir
+make
+make install
+
+cd $project_dir
+build_dir="$project_dir/out/build/flora"
+additional_opt=""
+
+if test $test_build = true; then
+  additional_opt="--test"
+fi
+
+./config \
+  "$additional_opt" \
+  --build-dir="$build_dir" \
+  --cmake-modules="$project_dir/deps/cmake-modules" \
+  --find_root_path="$prjroot/out" \
+  --prefix="$project_dir/out/usr"
+cd $build_dir
+make
+make install
