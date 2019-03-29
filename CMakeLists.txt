@@ -67,8 +67,6 @@ if (BUILD_DEBUG)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0 -DFLORA_DEBUG")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
-  set(CMAKE_SHARED_LINKER_FLAGS "-s")
-  set(CMAKE_EXE_LINKER_FLAGS "-s")
 endif()
 if (CROSS_COMPILE_CXXFLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CROSS_COMPILE_CXXFLAGS}")
@@ -104,9 +102,6 @@ set_target_properties(flora-svc-static PROPERTIES
 target_include_directories(flora-svc-static PRIVATE
   include
   ${mutils_INCLUDE_DIRS}
-)
-target_link_libraries(flora-svc-static
-  ${mutils_LIBRARIES}
 )
 target_compile_options(flora-svc-static PRIVATE -DROKID_LOG_ENABLED=${SVC_LOGLEVEL})
 add_library(flora-svc SHARED
@@ -144,9 +139,6 @@ set_target_properties(flora-cli-static PROPERTIES
 target_include_directories(flora-cli-static PRIVATE
   include
   ${mutils_INCLUDE_DIRS}
-)
-target_link_libraries(flora-cli-static
-  ${mutils_LIBRARIES}
 )
 target_compile_options(flora-cli-static PRIVATE -DROKID_LOG_ENABLED=${CLI_LOGLEVEL})
 add_library(flora-cli SHARED
