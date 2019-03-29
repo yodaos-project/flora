@@ -94,12 +94,27 @@ set(flora_svc_SOURCES
   src/ser-helper.h
   src/ser-helper.cc
 )
+add_library(flora-svc-static STATIC
+  ${flora_svc_SOURCES}
+)
+set_target_properties(flora-svc-static PROPERTIES
+  OUTPUT_NAME flora-svc
+  POSITION_INDEPENDENT_CODE ON
+)
+target_include_directories(flora-svc-static PRIVATE
+  include
+  ${mutils_INCLUDE_DIRS}
+)
+target_link_libraries(flora-svc-static
+  ${mutils_LIBRARIES}
+)
+target_compile_options(flora-svc-static PRIVATE -DROKID_LOG_ENABLED=${SVC_LOGLEVEL})
 add_library(flora-svc SHARED
   ${flora_svc_SOURCES}
 )
 target_include_directories(flora-svc PRIVATE
-    include
-    ${mutils_INCLUDE_DIRS}
+  include
+  ${mutils_INCLUDE_DIRS}
 )
 target_link_libraries(flora-svc
   ${mutils_LIBRARIES}
@@ -119,6 +134,21 @@ set(flora_cli_SOURCES
   src/ser-helper.cc
   src/flora-agent.cc
 )
+add_library(flora-cli-static STATIC
+  ${flora_cli_SOURCES}
+)
+set_target_properties(flora-cli-static PROPERTIES
+  OUTPUT_NAME flora-cli
+  POSITION_INDEPENDENT_CODE ON
+)
+target_include_directories(flora-cli-static PRIVATE
+  include
+  ${mutils_INCLUDE_DIRS}
+)
+target_link_libraries(flora-cli-static
+  ${mutils_LIBRARIES}
+)
+target_compile_options(flora-cli-static PRIVATE -DROKID_LOG_ENABLED=${CLI_LOGLEVEL})
 add_library(flora-cli SHARED
   ${flora_cli_SOURCES}
 )
@@ -153,8 +183,9 @@ install(TARGETS flora-monitor
 endif(ncurses_LIBRARIES)
 
 # install
-install(TARGETS flora-svc flora-cli
+install(TARGETS flora-svc flora-cli flora-svc-static flora-cli-static
   LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
 )
 file(GLOB flora_headers include/*.h)
 install(FILES ${flora_headers} DESTINATION include)
