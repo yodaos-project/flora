@@ -3,10 +3,11 @@ project(flora)
 set(VERSION 0.1)
 set(CMAKE_CXX_STANDARD 11)
 
+set(BUILD_LIBRARY_TYPE SHARED CACHE STRING "force build library type")
 option(USE_GCC "force use gcc" OFF)
 if (USE_GCC)
-SET(CMAKE_C_COMPILER gcc)
-SET(CMAKE_CXX_COMPILER g++)
+  SET(CMAKE_C_COMPILER gcc)
+  SET(CMAKE_CXX_COMPILER g++)
 endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
   set(COMPILER_IS_CLANG TRUE)
@@ -74,10 +75,6 @@ if (CROSS_COMPILE_CXXFLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CROSS_COMPILE_CXXFLAGS}")
 endif()
 
-#file(GLOB_RECURSE UWS_SOURCES 
-# src/*.h
-# src/*.cpp
-#)
 set(flora_svc_SOURCES
   include/flora-svc.h
   include/flora-cli.h
@@ -94,7 +91,7 @@ set(flora_svc_SOURCES
   src/ser-helper.h
   src/ser-helper.cc
 )
-add_library(flora-svc SHARED
+add_library(flora-svc ${BUILD_LIBRARY_TYPE}
   ${flora_svc_SOURCES}
 )
 target_include_directories(flora-svc PRIVATE
@@ -119,7 +116,7 @@ set(flora_cli_SOURCES
   src/ser-helper.cc
   src/flora-agent.cc
 )
-add_library(flora-cli SHARED
+add_library(flora-cli ${BUILD_LIBRARY_TYPE}
   ${flora_cli_SOURCES}
 )
 target_include_directories(flora-cli PRIVATE

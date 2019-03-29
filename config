@@ -13,6 +13,7 @@ Configuration:
     --prefix=PREFIX             install prefix
     --cmake-modules=DIR         directory of cmake modules file exist
     --find-root-path=DIR        root dir for search dependencies libs
+    --build-library-type=*      force build library type(STATIC|SHARED)
     --svc-log-level=*           log level of flora service(verbose|debug|info|warning|error|none)
     --cli-log-level=*           log level of flora client(verbose|debug|info|warning|error|none)
     --use-gcc                   force use gcc compiler (in macosx)
@@ -82,6 +83,9 @@ do
       ;;
     --find-root-path=*)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCMAKE_FIND_ROOT_PATH=$conf_optarg)
+      ;;
+    --build-library-type=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_LIBRARY_TYPE=$conf_optarg)
       ;;
   esac
 done

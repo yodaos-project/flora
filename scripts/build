@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -ex
 
+project_dir=$(pwd)
+
+prefix="$project_dir/out/usr"
 test_build=false
 while [ $# -gt 0 ]; do
   case "$1" in
+    --prefix)
+      prefix=$2
+      shift
+      ;;
     --test)
       test_build=true
-      shift
       ;;
     -h|--help)
       printf "$help"
@@ -19,14 +25,12 @@ while [ $# -gt 0 ]; do
   shift $(( $# > 0 ? 1 : 0 ))
 done
 
-project_dir=$(pwd)
-
 cd deps/mutils
 build_dir="$project_dir/out/build/mutils"
 ./config \
   --build-dir="$build_dir" \
   --cmake-modules="$project_dir/deps/cmake-modules" \
-  --prefix="$project_dir/out/usr"
+  --prefix="$prefix"
 cd $build_dir
 make
 make install
@@ -44,7 +48,7 @@ fi
   --build-dir="$build_dir" \
   --cmake-modules="$project_dir/deps/cmake-modules" \
   --find_root_path="$prjroot/out" \
-  --prefix="$project_dir/out/usr"
+  --prefix="$prefix"
 cd $build_dir
 make
 make install
