@@ -1,8 +1,9 @@
-#include "flora-agent.h"
 #include <curses.h>
 #include <list>
 #include <stdio.h>
 #include <string.h>
+#include "xmopt.h"
+#include "flora-agent.h"
 
 using namespace std;
 using namespace flora;
@@ -13,9 +14,19 @@ static char textBuffer[64];
 static const char *COLUMN_HEADER_TEXT[] = {"PID", "NAME"};
 
 typedef struct {
+  string floraUri{"unix:/var/run/flora.sock"};
 } CmdlineArgs;
 
 static bool parseCmdline(int argc, char **argv, CmdlineArgs &res) {
+  XMOptions options;
+  if (!options.parse(argc, argv)) {
+    return false;
+  }
+  auto it = options.find(nullptr);
+  it.next();
+  auto opt = it.next();
+  if (opt != nullptr)
+    res.floraUri = opt->value();
   return true;
 }
 
@@ -117,8 +128,8 @@ static void doMonitor(CmdlineArgs &args) {
 
   Agent agent;
   MonitorView monitorView;
-  agent.config(FLORA_AGENT_CONFIG_URI,
-               "unix:/var/run/flora.sock#flora-monitor");
+  string uri = args.floraUri + "#flora-monitor";
+  agent.config(FLORA_AGENT_CONFIG_URI, uri.c_str());
   agent.config(FLORA_AGENT_CONFIG_MONITOR, FLORA_CLI_FLAG_MONITOR,
                &monitorView);
   agent.start();
