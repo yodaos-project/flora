@@ -506,6 +506,10 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
   if (c <= 0)
     return FLORA_CLI_EINVAL;
 
+  // timepoint of call timeout
+  // +200ms for socket data transfer cost time
+  auto tp = steady_clock::now() + milliseconds(timeout + 200);
+
   unique_lock<mutex> locker(req_mutex);
   PendingRequestList::iterator it =
       pending_requests.emplace(pending_requests.end());
@@ -531,12 +535,16 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
       break;
     }
 
-    if (connection.get() == nullptr) {
+    if (connection->closed()) {
       retcode = close_reason;
       goto exit;
     }
 
-    req_reply_cond.wait(locker);
+    auto wr = req_reply_cond.wait_until(locker, tp);
+    if (wr == cv_status::timeout) {
+      retcode = FLORA_CLI_ETIMEOUT;
+      break;
+    }
   }
 
 exit:
