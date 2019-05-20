@@ -4,6 +4,7 @@
 #include "defs.h"
 #include "disp.h"
 #include "flora-cli.h"
+#include <arpa/inet.h>
 #include <stdint.h>
 #include <vector>
 
@@ -50,15 +51,17 @@ public:
                                 uint32_t flags);
 
   static int32_t serialize_post(const char *name, uint32_t msgtype,
-                                std::shared_ptr<Caps> &args, void *data,
-                                uint32_t size, uint32_t flags);
-
-  static int32_t serialize_call(const char *name, std::shared_ptr<Caps> &args,
-                                int32_t id, void *data, uint32_t size,
+                                std::shared_ptr<Caps> &args, uint64_t tag,
+                                const char *cliname, void *data, uint32_t size,
                                 uint32_t flags);
 
+  static int32_t serialize_call(const char *name, std::shared_ptr<Caps> &args,
+                                int32_t id, uint64_t tag, const char *cliname,
+                                void *data, uint32_t size, uint32_t flags);
+
   static int32_t serialize_reply(int32_t id, int32_t rescode, Response *reply,
-                                 void *data, uint32_t size, uint32_t flags);
+                                 uint64_t tag, void *data, uint32_t size,
+                                 uint32_t flags);
 
   static int32_t serialize_monitor_list_all(AdapterInfoMap &infos, void *data,
                                             uint32_t size, uint32_t flags);
@@ -138,13 +141,15 @@ public:
   static int32_t parse_auth(std::shared_ptr<Caps> &caps, int32_t &result);
 
   static int32_t parse_post(std::shared_ptr<Caps> &caps, std::string &name,
-                            uint32_t &msgtype, std::shared_ptr<Caps> &args);
+                            uint32_t &msgtype, std::shared_ptr<Caps> &args,
+                            uint64_t &tag, std::string &cliname);
 
   static int32_t parse_call(std::shared_ptr<Caps> &caps, std::string &name,
-                            std::shared_ptr<Caps> &args, int32_t &id);
+                            std::shared_ptr<Caps> &args, int32_t &id,
+                            uint64_t &tag, std::string &cliname);
 
   static int32_t parse_reply(std::shared_ptr<Caps> &caps, int32_t &id,
-                             int32_t &rescode, Response &reply);
+                             int32_t &rescode, Response &reply, uint64_t &tag);
 
   static int32_t parse_monitor_list_all(std::shared_ptr<Caps> &caps,
                                         std::vector<MonitorListItem> &infos);
@@ -183,6 +188,43 @@ public:
 };
 
 bool is_valid_msgtype(uint32_t msgtype);
+
+class TagHelper {
+public:
+  static uint64_t create(struct sockaddr_in& addr) {
+    return (((uint64_t)(0x80000000 | addr.sin_port)) << 32) | addr.sin_addr.s_addr;
+  }
+
+  static uint64_t create(uint32_t pid) { return pid; }
+
+  // return: 0  unix
+  //         1  tcp
+  static uint32_t type(uint64_t tag) {
+    return (tag >> 32) & 0x80000000;
+  }
+
+  static pid_t pid(uint64_t tag) {
+    return tag & 0xffffffff;
+  }
+
+  static const char* ipaddr(uint64_t tag) {
+    struct in_addr iaddr;
+    iaddr.s_addr = (tag & 0xffffffff);
+    return inet_ntoa(iaddr);
+  }
+
+  static uint16_t port(uint64_t tag) {
+    return (tag >> 32) & 0xffff;
+  }
+
+  static void to_addr_string(uint64_t tag, std::string& str) {
+    str = ipaddr(tag);
+    str += ':';
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", port(tag));
+    str += buf;
+  }
+};
 
 } // namespace internal
 } // namespace flora

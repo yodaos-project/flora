@@ -20,6 +20,7 @@ Configuration:
 Dependencies:
     --mutils=DIR                specify mutils install dir
     --ncurses=DIR               specify ncurses install dir
+    --gtest=DIR                 specify gtest install dir
 
 Cross Compile:
     --toolchain=DIR             toolchain install dir
@@ -72,6 +73,9 @@ do
       ;;
     --ncurses=*)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DncursesPrefix=$conf_optarg)
+      ;;
+    --gtest=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DgtestPrefix=$conf_optarg)
       ;;
     --toolchain=*)
       CMAKE_ARGS=(${CMAKE_ARGS[@]} -DTOOLCHAIN_HOME=$conf_optarg)

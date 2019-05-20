@@ -33,7 +33,6 @@ static bool parseCmdline(int argc, char **argv, CmdlineArgs &res) {
 class FloraClientInfo {
 public:
   uint32_t id = 0;
-  int32_t pid = 0;
   string name;
   uint32_t flags = 0;
 };
@@ -45,7 +44,6 @@ public:
     while (it != items.end()) {
       auto fcit = floraClients.emplace(floraClients.end());
       fcit->id = it->id;
-      fcit->pid = it->pid;
       fcit->name = it->name;
       fcit->flags = it->flags;
       ++it;
@@ -56,7 +54,6 @@ public:
   void list_add(MonitorListItem &item) {
     auto fcit = floraClients.emplace(floraClients.end());
     fcit->id = item.id;
-    fcit->pid = item.pid;
     fcit->name = item.name;
     fcit->flags = item.flags;
     updateMonitorScreen();
@@ -98,7 +95,7 @@ private:
 
   void printTabLine(FloraClientInfo &info) {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", info.pid);
+    // snprintf(buf, sizeof(buf), "%d", info.pid);
     printTabCell(0, buf);
     printTabCell(1, info.name.c_str());
     printw("\n");

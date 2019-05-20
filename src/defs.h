@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLORA_VERSION 3
+#define FLORA_VERSION 4
 
 // client --> server
 #define CMD_AUTH_REQ 0

@@ -155,13 +155,16 @@ int32_t ResponseSerializer::serialize_auth(int32_t result, void *data,
 }
 
 int32_t ResponseSerializer::serialize_post(const char *name, uint32_t msgtype,
-                                           shared_ptr<Caps> &args, void *data,
+                                           shared_ptr<Caps> &args, uint64_t tag,
+                                           const char* cliname, void *data,
                                            uint32_t size, uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_POST_RESP);
   caps->write(msgtype);
   caps->write(name);
   caps->write(args);
+  caps->write(tag);
+  caps->write(cliname);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -172,6 +175,7 @@ int32_t ResponseSerializer::serialize_post(const char *name, uint32_t msgtype,
 
 int32_t ResponseSerializer::serialize_call(const char *name,
                                            shared_ptr<Caps> &args, int32_t id,
+                                           uint64_t tag, const char *cliname,
                                            void *data, uint32_t size,
                                            uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
@@ -179,6 +183,8 @@ int32_t ResponseSerializer::serialize_call(const char *name,
   caps->write(id);
   caps->write(name);
   caps->write(args);
+  caps->write(tag);
+  caps->write(cliname);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -188,8 +194,9 @@ int32_t ResponseSerializer::serialize_call(const char *name,
 }
 
 int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
-                                            Response *reply, void *data,
-                                            uint32_t size, uint32_t flags) {
+                                            Response *reply, uint64_t tag,
+                                            void *data, uint32_t size,
+                                            uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_REPLY_RESP);
   caps->write(id);
@@ -199,6 +206,7 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
     caps->write(reply->data);
     caps->write(reply->extra.c_str());
   }
+  caps->write(tag);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -210,7 +218,6 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
 static shared_ptr<Caps> serialize_monitor_list_item(AdapterInfo &info) {
   shared_ptr<Caps> r = Caps::new_instance();
   r->write(info.id);
-  r->write(info.pid);
   r->write(info.name);
   r->write(info.flags);
   return r;
@@ -427,29 +434,40 @@ int32_t ResponseParser::parse_auth(shared_ptr<Caps> &caps, int32_t &result) {
 }
 
 int32_t ResponseParser::parse_post(shared_ptr<Caps> &caps, string &name,
-                                   uint32_t &msgtype, shared_ptr<Caps> &args) {
+                                   uint32_t &msgtype, shared_ptr<Caps> &args,
+                                   uint64_t &tag, string &cliname) {
   if (caps->read(msgtype) != CAPS_SUCCESS)
     return -1;
   if (caps->read(name) != CAPS_SUCCESS)
     return -1;
   if (caps->read(args) != CAPS_SUCCESS)
     return -1;
+  if (caps->read(tag) != CAPS_SUCCESS)
+    return -1;
+  if (caps->read(cliname) != CAPS_SUCCESS)
+    return -1;
   return 0;
 }
 
 int32_t ResponseParser::parse_call(shared_ptr<Caps> &caps, string &name,
-                                   shared_ptr<Caps> &args, int32_t &id) {
+                                   shared_ptr<Caps> &args, int32_t &id,
+                                   uint64_t &tag, string &cliname) {
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
   if (caps->read(name) != CAPS_SUCCESS)
     return -1;
   if (caps->read(args) != CAPS_SUCCESS)
     return -1;
+  if (caps->read(tag) != CAPS_SUCCESS)
+    return -1;
+  if (caps->read(cliname) != CAPS_SUCCESS)
+    return -1;
   return 0;
 }
 
 int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
-                                    int32_t &rescode, Response &reply) {
+                                    int32_t &rescode, Response &reply,
+                                    uint64_t &tag) {
   if (caps->read(id) != CAPS_SUCCESS)
     return -1;
   if (caps->read(rescode) != CAPS_SUCCESS)
@@ -462,6 +480,8 @@ int32_t ResponseParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
     if (caps->read(reply.extra) != CAPS_SUCCESS)
       return -1;
   }
+  if (caps->read(tag) != CAPS_SUCCESS)
+    return -1;
   return 0;
 }
 
@@ -482,12 +502,11 @@ int32_t ResponseParser::parse_monitor_list_all(shared_ptr<Caps> &caps,
     MonitorListItem &i = infos.back();
     if (sub->read(i.id) != CAPS_SUCCESS)
       return -1;
-    if (sub->read(i.pid) != CAPS_SUCCESS)
-      return -1;
     if (sub->read(i.name) != CAPS_SUCCESS)
       return -1;
     if (sub->read(i.flags) != CAPS_SUCCESS)
       return -1;
+    // TODO: set i.tag
   }
   return infos.size() == size ? 0 : -1;
 }
@@ -499,12 +518,11 @@ int32_t ResponseParser::parse_monitor_list_add(shared_ptr<Caps> &caps,
     return -1;
   if (sub->read(info.id) != CAPS_SUCCESS)
     return -1;
-  if (sub->read(info.pid) != CAPS_SUCCESS)
-    return -1;
   if (sub->read(info.name) != CAPS_SUCCESS)
     return -1;
   if (sub->read(info.flags) != CAPS_SUCCESS)
     return -1;
+  // TODO: set i.tag
   return 0;
 }
 

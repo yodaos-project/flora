@@ -128,7 +128,7 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
 
 void Dispatcher::pending_call_timeout(PendingCall &pc) {
   int32_t c = ResponseSerializer::serialize_reply(pc.cliid, FLORA_CLI_ETIMEOUT,
-                                                  nullptr, buffer, buf_size,
+                                                  nullptr, 0, buffer, buf_size,
                                                   pc.sender->serialize_flags);
   pc.sender->write(buffer, c);
 }
@@ -181,15 +181,17 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
     KLOGE(TAG, "<<< %s: auth failed. version not supported, excepted %u",
           extra.c_str(), FLORA_VERSION);
   } else {
+    if (sender->tag == 0)
+      sender->tag = TagHelper::create(pid);
     if (flags & FLORA_CLI_FLAG_MONITOR) {
       if ((this->flags & FLORA_DISP_FLAG_MONITOR) == 0) {
         result = FLORA_CLI_EAUTH;
         KLOGE(TAG, "<<< %s: auth failed. service not support monitor mode",
               extra.c_str());
       } else {
-        add_monitor(extra, pid, flags, sender);
+        add_monitor(extra, flags, sender);
       }
-    } else if (!add_adapter(extra, pid, flags, sender)) {
+    } else if (!add_adapter(extra, flags, sender)) {
       result = FLORA_CLI_EDUPID;
       KLOGE(TAG, "<<< %s: auth failed. client id already used", extra.c_str());
     }
@@ -218,7 +220,9 @@ void Dispatcher::do_erase_adapter(shared_ptr<Adapter> &sender) {
   if (sender->info->flags & FLORA_CLI_FLAG_MONITOR)
     monitors.erase(reinterpret_cast<intptr_t>(sender.get()));
   else {
-    KLOGI(TAG, "erase adapter <%d>:%s", sender->info->pid,
+    string str;
+    TagHelper::to_addr_string(sender->tag, str);
+    KLOGI(TAG, "erase adapter <%s>:%s", str.c_str(),
           sender->info->name.c_str());
     write_monitor_list_remove(sender->info->id);
     adapter_infos.erase(reinterpret_cast<intptr_t>(sender.get()));
@@ -247,8 +251,8 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps> &msg_caps,
   PersistMsgMap::iterator pit = persist_msgs.find(name);
   if (pit != persist_msgs.end()) {
     int32_t c = ResponseSerializer::serialize_post(
-        name.c_str(), FLORA_MSGTYPE_PERSIST, pit->second.data, buffer, buf_size,
-        sender->serialize_flags);
+        name.c_str(), FLORA_MSGTYPE_PERSIST, pit->second.data, 0, "", buffer,
+        buf_size, sender->serialize_flags);
     if (c > 0) {
       KLOGI(TAG, ">>> %s: dispatch persist msg %s", sender->info->name.c_str(),
             name.c_str());
@@ -352,9 +356,13 @@ bool Dispatcher::post_msg(const string &name, uint32_t type,
       }
       ++ait;
     }
-    write_post_msg_to_adapters(name, type, args, 0, nobo_adapters, cli_name);
-    write_post_msg_to_adapters(name, type, args, CAPS_FLAG_NET_BYTEORDER,
-                               bo_adapters, cli_name);
+    if (!nobo_adapters.empty())
+      write_post_msg_to_adapters(name, type, args, sender->tag, 0,
+                                 nobo_adapters, cli_name);
+    if (!bo_adapters.empty())
+      write_post_msg_to_adapters(name, type, args, sender->tag,
+                                 CAPS_FLAG_NET_BYTEORDER, bo_adapters,
+                                 cli_name);
   }
 
   if (type == FLORA_MSGTYPE_PERSIST) {
@@ -364,13 +372,11 @@ bool Dispatcher::post_msg(const string &name, uint32_t type,
   return true;
 }
 
-void Dispatcher::write_post_msg_to_adapters(const string &name, uint32_t type,
-                                            shared_ptr<Caps> &args,
-                                            uint32_t flags,
-                                            AdapterList &adapters,
-                                            const char *sender_name) {
-  int32_t c = ResponseSerializer::serialize_post(name.c_str(), type, args,
-                                                 buffer, buf_size, flags);
+void Dispatcher::write_post_msg_to_adapters(
+    const string &name, uint32_t type, shared_ptr<Caps> &args, uint64_t tag,
+    uint32_t flags, AdapterList &adapters, const char *sender_name) {
+  int32_t c = ResponseSerializer::serialize_post(
+      name.c_str(), type, args, tag, sender_name, buffer, buf_size, flags);
   if (c < 0)
     return;
   AdapterList::iterator ait;
@@ -423,7 +429,7 @@ bool Dispatcher::handle_call_req(shared_ptr<Caps> &msg_caps,
   int32_t c;
   if (it == named_adapters.end() || !it->second->info->has_method(name)) {
     c = ResponseSerializer::serialize_reply(cliid, FLORA_CLI_ENEXISTS, nullptr,
-                                            buffer, buf_size,
+                                            0, buffer, buf_size,
                                             sender->serialize_flags);
     if (c < 0)
       return false;
@@ -434,8 +440,9 @@ bool Dispatcher::handle_call_req(shared_ptr<Caps> &msg_caps,
   }
   int32_t svrid = ++reqseq;
   add_pending_call(svrid, cliid, sender, it->second, timeout);
-  c = ResponseSerializer::serialize_call(name.c_str(), args, svrid, buffer,
-                                         buf_size, it->second->serialize_flags);
+  c = ResponseSerializer::serialize_call(
+      name.c_str(), args, svrid, sender->tag, sender->info->name.c_str(),
+      buffer, buf_size, it->second->serialize_flags);
   if (c < 0)
     return false;
   KLOGI(TAG, "%s >>> %s: call %d/%s", sender->info->name.c_str(),
@@ -472,7 +479,7 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
   resp.data = data;
   resp.extra = sender->info->name;
   int32_t c = ResponseSerializer::serialize_reply(
-      (*it).cliid, FLORA_CLI_SUCCESS, &resp, buffer, buf_size,
+      (*it).cliid, FLORA_CLI_SUCCESS, &resp, sender->tag, buffer, buf_size,
       (*it).sender->serialize_flags);
   if (c < 0)
     return false;
@@ -497,7 +504,7 @@ bool Dispatcher::handle_ping_req(shared_ptr<Caps> &msg_caps,
   return true;
 }
 
-bool Dispatcher::add_adapter(const string &name, int32_t pid, uint32_t flags,
+bool Dispatcher::add_adapter(const string &name, uint32_t flags,
                              shared_ptr<Adapter> &adapter) {
   if (name.length() > 0) {
     auto r2 = named_adapters.insert(make_pair(name, adapter));
@@ -509,7 +516,6 @@ bool Dispatcher::add_adapter(const string &name, int32_t pid, uint32_t flags,
   auto r1 = adapter_infos.insert(
       make_pair(reinterpret_cast<intptr_t>(adapter.get()), info));
   if (r1.second) {
-    r1.first->second.pid = pid;
     r1.first->second.name = name;
     r1.first->second.flags = flags;
     adapter->info = &r1.first->second;
@@ -517,13 +523,12 @@ bool Dispatcher::add_adapter(const string &name, int32_t pid, uint32_t flags,
   return true;
 }
 
-void Dispatcher::add_monitor(const string &name, int32_t pid, uint32_t flags,
+void Dispatcher::add_monitor(const string &name, uint32_t flags,
                              shared_ptr<Adapter> &adapter) {
   AdapterInfo info;
   auto r = monitors.insert(
       make_pair(reinterpret_cast<intptr_t>(adapter.get()), info));
   if (r.second) {
-    r.first->second.pid = pid;
     r.first->second.name = name;
     r.first->second.flags = flags;
     adapter->info = &r.first->second;

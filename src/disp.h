@@ -79,10 +79,10 @@ private:
   bool handle_ping_req(std::shared_ptr<Caps> &msg_caps,
                        std::shared_ptr<Adapter> &sender);
 
-  bool add_adapter(const std::string &name, int32_t pid, uint32_t flags,
+  bool add_adapter(const std::string &name, uint32_t flags,
                    std::shared_ptr<Adapter> &adapter);
 
-  void add_monitor(const std::string &name, int32_t pid, uint32_t flags,
+  void add_monitor(const std::string &name, uint32_t flags,
                    std::shared_ptr<Adapter> &adapter);
 
   void handle_cmds();
@@ -101,10 +101,10 @@ private:
   bool post_msg(const std::string &name, uint32_t type,
                 std::shared_ptr<Caps> &args, Adapter *sender);
 
-  void write_post_msg_to_adapters(const std::string &name, uint32_t type,
-                                  std::shared_ptr<Caps> &args, uint32_t flags,
-                                  AdapterList &adapters,
-                                  const char *sender_name);
+  void write_post_msg_to_adapters(
+      const std::string &name, uint32_t type, std::shared_ptr<Caps> &args,
+      uint64_t tag, uint32_t flags, AdapterList &adapters,
+      const char *sender_name);
 
   void do_erase_adapter(std::shared_ptr<Adapter> &sender);
 

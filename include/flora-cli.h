@@ -135,9 +135,9 @@ public:
 class MonitorListItem {
 public:
   uint32_t id;
-  int32_t pid;
-  std::string name;
   uint32_t flags;
+  uint64_t tag;
+  std::string name;
 };
 
 class MonitorSubscriptionItem {
@@ -194,6 +194,31 @@ public:
   virtual void disconnected() {}
 };
 
+class MsgSender {
+public:
+  // return:  0  unix domain socket connection
+  //          1  tcp socket connection
+  static uint32_t connection_type();
+
+  // pid of msg sender, if connection type is unix domain socket connection
+  static pid_t pid();
+
+  // identify of msg sender
+  static uint64_t tag();
+
+  // ipv4 addr string, if connection type is tcp socket connection
+  static const char* ipaddr();
+
+  // ipv4 port, if connection type is tcp socket connection
+  static uint16_t port();
+
+  static const char* name();
+
+  // pid string, if connection type is unix domain socket connection
+  // ipaddr:port, if connection type is tcp socket connection
+  static void to_string(std::string& str);
+};
+
 } // namespace flora
 
 extern "C" {
@@ -229,9 +254,9 @@ typedef void (*flora_call_callback_t)(int32_t rescode,
                                       flora_call_result *result, void *arg);
 
 typedef struct {
-  uint32_t id;
-  int32_t pid;
+  uint64_t tag;
   const char *name;
+  uint32_t id;
 } flora_cli_monitor_list_item;
 typedef struct {
   const char *name;

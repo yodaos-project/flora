@@ -1,4 +1,5 @@
 #include "sock-poll.h"
+#include "ser-helper.h"
 #include "flora-svc.h"
 #include "rlog.h"
 #include <chrono>
@@ -96,10 +97,14 @@ static int unix_accept(int lfd) {
   return accept(lfd, (sockaddr *)&addr, &addr_len);
 }
 
-static int tcp_accept(int lfd) {
+static int tcp_accept(int lfd, uint64_t& tag) {
   sockaddr_in addr;
   socklen_t addr_len = sizeof(addr);
-  return accept(lfd, (sockaddr *)&addr, &addr_len);
+  auto fd = accept(lfd, (sockaddr *)&addr, &addr_len);
+  if (fd < 0)
+    return fd;
+  tag = TagHelper::create(addr);
+  return fd;
 }
 
 void SocketPoll::run() {
@@ -162,14 +167,16 @@ void SocketPoll::run() {
 
 shared_ptr<Adapter> SocketPoll::do_accept(int lfd) {
   int new_fd = -1;
+  uint64_t tag = 0;
 
   if (type == POLL_TYPE_TCP)
-    new_fd = tcp_accept(lfd);
+    new_fd = tcp_accept(lfd, tag);
   else
     new_fd = unix_accept(lfd);
   if (new_fd < 0)
     return nullptr;
   auto adap = new_adapter(new_fd);
+  adap->tag = tag;
   adapters.insert(make_pair(new_fd, adap));
   return adap;
 }

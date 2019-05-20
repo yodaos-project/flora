@@ -13,6 +13,9 @@ using namespace std;
 using namespace std::chrono;
 using rokid::Uri;
 
+thread_local uint64_t flora::internal::Client::tag = 0;
+thread_local string flora::internal::Client::sender_name;
+
 static bool ignore_sigpipe = false;
 int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
                                flora::MonitorCallback *mcb,
@@ -229,7 +232,8 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
     string name;
     shared_ptr<Caps> args;
 
-    if (ResponseParser::parse_post(resp, name, msgtype, args) != 0) {
+    if (ResponseParser::parse_post(resp, name, msgtype, args, tag,
+                                   sender_name) != 0) {
       return false;
     }
     if (cli_callback) {
@@ -241,7 +245,8 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
     string name;
     int32_t msgid;
     shared_ptr<Caps> args;
-    if (ResponseParser::parse_call(resp, name, args, msgid) != 0) {
+    if (ResponseParser::parse_call(resp, name, args, msgid, tag,
+                                   sender_name) != 0) {
       return false;
     }
     if (cli_callback) {
@@ -258,7 +263,7 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
     PendingRequestList::iterator it;
     Response response;
 
-    if (ResponseParser::parse_reply(resp, msgid, rescode, response) != 0) {
+    if (ResponseParser::parse_reply(resp, msgid, rescode, response, tag) != 0) {
       KLOGW(TAG, "parse reply failed");
       return false;
     }
@@ -731,6 +736,47 @@ void ReplyImpl::end(int32_t code, std::shared_ptr<Caps> &data) {
 }
 
 } // namespace internal
+} // namespace flora
+
+namespace flora {
+uint32_t MsgSender::connection_type() {
+  return flora::internal::TagHelper::type(flora::internal::Client::tag);
+}
+
+pid_t MsgSender::pid() {
+  return flora::internal::TagHelper::pid(flora::internal::Client::tag);
+}
+
+uint64_t MsgSender::tag() {
+  return flora::internal::Client::tag;
+}
+
+const char* MsgSender::ipaddr() {
+  return flora::internal::TagHelper::ipaddr(flora::internal::Client::tag);
+}
+
+uint16_t MsgSender::port() {
+  return flora::internal::TagHelper::port(flora::internal::Client::tag);
+}
+
+const char* MsgSender::name() {
+  return flora::internal::Client::sender_name.c_str();
+}
+
+void MsgSender::to_string(string& str) {
+  str = "[";
+  if (MsgSender::connection_type() == 0) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", MsgSender::pid());
+    str += buf;
+  } else {
+    string tmp;
+    flora::internal::TagHelper::to_addr_string(flora::internal::Client::tag, tmp);
+    str += tmp;
+  }
+  str += "]";
+  str += MsgSender::name();
+}
 } // namespace flora
 
 using flora::Reply;

@@ -16,7 +16,7 @@ endif()
 include (${CUSTOM_CMAKE_MODULES}/common.mk)
 
 option(BUILD_DEBUG "debug or release" OFF)
-option(BUILD_TEST "build unit-tests" OFF)
+option(BUILD_TEST "build tests" OFF)
 
 function(parseLogLevel varName)
 if (NOT ${varName})
@@ -184,37 +184,20 @@ install(FILES ${flora_headers} DESTINATION include)
 
 # unit-tests
 if (BUILD_TEST)
-file(GLOB flora_unit_test_SOURCES
-  unit-tests/*.h
-  unit-tests/*.cc
+findPackage(gtest REQUIRED
+  HINTS ${gtestPrefix}
+  HEADERS gtest/gtest.h
+  STATIC_LIBS gtest
 )
-add_executable(flora-test
-  ${flora_unit_test_SOURCES}
+add_executable(test test/main.cc test/simple.cc test/svc.h)
+target_include_directories(test PRIVATE
+  include
+  ${gtest_INCLUDE_DIRS}
+  ${mutils_INCLUDE_DIRS}
 )
-target_include_directories(flora-test
-  PRIVATE include ${mutils_INCLUDE_DIRS}
-)
-target_link_libraries(flora-test
+target_link_libraries(test
   flora-cli
   flora-svc
-  ${mutils_LIBRARIES}
-)
-set_target_properties(flora-test PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
-install(TARGETS flora-test RUNTIME DESTINATION bin)
-
-file(GLOB flora_demo_SOURCES
-  examples/*.h
-  examples/*.cc
-)
-add_executable(flora-demo
-  ${flora_demo_SOURCES}
-)
-target_include_directories(flora-demo
-  PRIVATE include ${mutils_INCLUDE_DIRS}
-)
-target_link_libraries(flora-demo
-  flora-cli
-  flora-svc
-  ${mutils_LIBRARIES}
+  ${gtest_LIBRARIES}
 )
 endif(BUILD_TEST)

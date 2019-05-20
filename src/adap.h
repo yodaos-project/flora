@@ -14,7 +14,6 @@ public:
   AdapterInfo() { id = ++idseq; }
 
   uint32_t id;
-  int32_t pid = 0;
   std::string name;
   std::set<std::string> declared_methods;
   uint32_t flags = 0;
@@ -53,6 +52,11 @@ public:
 public:
   uint32_t serialize_flags;
   AdapterInfo *info = nullptr;
+  // unix socket adapter:  pid
+  // tcp socket adapter:
+  //   high 32 bits: 0x80000000 | ipv4port
+  //   low 32 bits: ipv4addr
+  uint64_t tag = 0;
 #ifdef FLORA_DEBUG
   uint32_t recv_times = 0;
   uint32_t recv_bytes = 0;

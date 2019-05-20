@@ -125,6 +125,8 @@ private:
 public:
   std::string auth_extra;
   ClientCallback *cli_callback = nullptr;
+  static thread_local uint64_t tag;
+  static thread_local std::string sender_name;
 #ifdef FLORA_DEBUG
   uint32_t post_times = 0;
   uint32_t post_bytes = 0;
