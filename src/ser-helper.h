@@ -200,7 +200,7 @@ public:
   // return: 0  unix
   //         1  tcp
   static uint32_t type(uint64_t tag) {
-    return (tag >> 32) & 0x80000000;
+    return ((tag >> 32) & 0x80000000) ? 1 : 0;
   }
 
   static pid_t pid(uint64_t tag) {
@@ -217,12 +217,17 @@ public:
     return (tag >> 32) & 0xffff;
   }
 
-  static void to_addr_string(uint64_t tag, std::string& str) {
-    str = ipaddr(tag);
-    str += ':';
+  static void to_string(uint64_t tag, std::string& str) {
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", port(tag));
-    str += buf;
+    if (type(tag) == 0) {
+      snprintf(buf, sizeof(buf), "%d", pid(tag));
+      str = buf;
+    } else {
+      str = ipaddr(tag);
+      str += ':';
+      snprintf(buf, sizeof(buf), "%d", port(tag));
+      str += buf;
+    }
   }
 };
 

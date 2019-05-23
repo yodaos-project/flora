@@ -765,15 +765,9 @@ const char* MsgSender::name() {
 
 void MsgSender::to_string(string& str) {
   str = "[";
-  if (MsgSender::connection_type() == 0) {
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%d", MsgSender::pid());
-    str += buf;
-  } else {
-    string tmp;
-    flora::internal::TagHelper::to_addr_string(flora::internal::Client::tag, tmp);
-    str += tmp;
-  }
+  string tmp;
+  flora::internal::TagHelper::to_string(flora::internal::Client::tag, tmp);
+  str += tmp;
   str += "]";
   str += MsgSender::name();
 }

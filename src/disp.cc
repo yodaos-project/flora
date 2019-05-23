@@ -221,7 +221,7 @@ void Dispatcher::do_erase_adapter(shared_ptr<Adapter> &sender) {
     monitors.erase(reinterpret_cast<intptr_t>(sender.get()));
   else {
     string str;
-    TagHelper::to_addr_string(sender->tag, str);
+    TagHelper::to_string(sender->tag, str);
     KLOGI(TAG, "erase adapter <%s>:%s", str.c_str(),
           sender->info->name.c_str());
     write_monitor_list_remove(sender->info->id);
