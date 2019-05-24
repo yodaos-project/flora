@@ -14,6 +14,7 @@ public:
   AdapterInfo() { id = ++idseq; }
 
   uint32_t id;
+  int32_t pid;
   std::string name;
   std::set<std::string> declared_methods;
   uint32_t flags = 0;

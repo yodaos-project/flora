@@ -189,13 +189,13 @@ findPackage(gtest REQUIRED
   HEADERS gtest/gtest.h
   STATIC_LIBS gtest
 )
-add_executable(test test/main.cc test/simple.cc test/svc.h)
-target_include_directories(test PRIVATE
+add_executable(flora-test test/main.cc test/simple.cc test/svc.h)
+target_include_directories(flora-test PRIVATE
   include
   ${gtest_INCLUDE_DIRS}
   ${mutils_INCLUDE_DIRS}
 )
-target_link_libraries(test
+target_link_libraries(flora-test
   flora-cli
   flora-svc
   ${gtest_LIBRARIES}

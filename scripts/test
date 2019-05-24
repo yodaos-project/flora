@@ -4,4 +4,4 @@ set -ex
 export LD_LIBRARY_PATH=$(pwd)/out/usr/lib
 export DYLD_LIBRARY_PATH=$(pwd)/out/usr/lib
 
-out/build/flora/flora-test
+out/build/flora/flora-test unix:flora.sock
