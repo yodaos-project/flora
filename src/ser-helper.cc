@@ -141,11 +141,13 @@ int32_t RequestSerializer::serialize_ping(void *data, uint32_t size,
   return r;
 }
 
-int32_t ResponseSerializer::serialize_auth(int32_t result, void *data,
-                                           uint32_t size, uint32_t flags) {
+int32_t ResponseSerializer::serialize_auth(int32_t result, uint32_t version,
+                                           void *data, uint32_t size,
+                                           uint32_t flags) {
   shared_ptr<Caps> caps = Caps::new_instance();
   caps->write(CMD_AUTH_RESP);
   caps->write(result);
+  caps->write(version);
   int32_t r = caps->serialize(data, size, flags);
   if (r < 0)
     return -1;
@@ -428,8 +430,11 @@ int32_t RequestParser::parse_reply(shared_ptr<Caps> &caps, int32_t &id,
   return 0;
 }
 
-int32_t ResponseParser::parse_auth(shared_ptr<Caps> &caps, int32_t &result) {
+int32_t ResponseParser::parse_auth(shared_ptr<Caps> &caps, int32_t &result,
+                                   uint32_t &version) {
   if (caps->read(result) != CAPS_SUCCESS)
+    return -1;
+  if (caps->read(version) != CAPS_SUCCESS)
     return -1;
   return 0;
 }

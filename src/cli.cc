@@ -217,8 +217,9 @@ bool Client::handle_received(int32_t size) {
 bool Client::handle_cmd_before_auth(int32_t cmd, shared_ptr<Caps> &resp) {
   if (cmd != CMD_AUTH_RESP)
     return false;
+  uint32_t version;
   lock_guard<mutex> locker(auth_result->amutex);
-  if (ResponseParser::parse_auth(resp, auth_result->result) < 0)
+  if (ResponseParser::parse_auth(resp, auth_result->result, version) < 0)
     return false;
   auth_result->acond.notify_one();
   cmd_handler = &Client::handle_cmd_after_auth;

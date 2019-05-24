@@ -196,8 +196,8 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
       KLOGE(TAG, "<<< %s: auth failed. client id already used", extra.c_str());
     }
   }
-  int32_t c = ResponseSerializer::serialize_auth(result, buffer, buf_size,
-                                                 sender->serialize_flags);
+  int32_t c = ResponseSerializer::serialize_auth(
+      result, FLORA_VERSION, buffer, buf_size, sender->serialize_flags);
   if (c < 0)
     return false;
   sender->write(buffer, c);
