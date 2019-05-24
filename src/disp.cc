@@ -176,7 +176,7 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
     return false;
   KLOGI(TAG, "<<< %s: auth ver %u, flags 0x%x", extra.c_str(), version, flags);
   int32_t result = FLORA_CLI_SUCCESS;
-  if (version != FLORA_VERSION) {
+  if (version < 3) {
     result = FLORA_CLI_EAUTH;
     KLOGE(TAG, "<<< %s: auth failed. version not supported, excepted %u",
           extra.c_str(), FLORA_VERSION);
@@ -191,7 +191,7 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
       } else {
         add_monitor(extra, flags, sender);
       }
-    } else if (!add_adapter(extra, flags, sender)) {
+    } else if (!add_adapter(extra, flags, pid, sender)) {
       result = FLORA_CLI_EDUPID;
       KLOGE(TAG, "<<< %s: auth failed. client id already used", extra.c_str());
     }
@@ -504,7 +504,7 @@ bool Dispatcher::handle_ping_req(shared_ptr<Caps> &msg_caps,
   return true;
 }
 
-bool Dispatcher::add_adapter(const string &name, uint32_t flags,
+bool Dispatcher::add_adapter(const string &name, uint32_t flags, int32_t pid,
                              shared_ptr<Adapter> &adapter) {
   if (name.length() > 0) {
     auto r2 = named_adapters.insert(make_pair(name, adapter));
@@ -518,6 +518,7 @@ bool Dispatcher::add_adapter(const string &name, uint32_t flags,
   if (r1.second) {
     r1.first->second.name = name;
     r1.first->second.flags = flags;
+    r1.first->second.pid = pid;
     adapter->info = &r1.first->second;
   }
   return true;

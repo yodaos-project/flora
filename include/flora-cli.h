@@ -135,9 +135,10 @@ public:
 class MonitorListItem {
 public:
   uint32_t id;
+  int32_t pid;
+  std::string name;
   uint32_t flags;
   uint64_t tag;
-  std::string name;
 };
 
 class MonitorSubscriptionItem {

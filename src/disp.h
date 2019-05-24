@@ -79,7 +79,7 @@ private:
   bool handle_ping_req(std::shared_ptr<Caps> &msg_caps,
                        std::shared_ptr<Adapter> &sender);
 
-  bool add_adapter(const std::string &name, uint32_t flags,
+  bool add_adapter(const std::string &name, uint32_t flags, int32_t pid,
                    std::shared_ptr<Adapter> &adapter);
 
   void add_monitor(const std::string &name, uint32_t flags,

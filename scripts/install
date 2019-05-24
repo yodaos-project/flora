@@ -3,3 +3,4 @@ set -ex
 
 scripts/pull-deps --repo Rokid/aife-mutils --ref master --dest deps/mutils
 scripts/pull-deps --repo Rokid/aife-cmake-modules --ref master --dest deps/cmake-modules
+scripts/pull-deps --repo google/googletest --ref release-1.8.1 --dest deps/googletest

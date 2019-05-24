@@ -37,6 +37,10 @@ additional_opt=""
 
 if test $test_build = true; then
   additional_opt="--test"
+  cd deps/googletest
+  cmake . -DCMAKE_INSTALL_PREFIX=$project_dir/out/usr
+  make install
+  cd $project_dir
 fi
 
 ./config \

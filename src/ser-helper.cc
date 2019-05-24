@@ -218,6 +218,7 @@ int32_t ResponseSerializer::serialize_reply(int32_t id, int32_t rescode,
 static shared_ptr<Caps> serialize_monitor_list_item(AdapterInfo &info) {
   shared_ptr<Caps> r = Caps::new_instance();
   r->write(info.id);
+  r->write(info.pid);
   r->write(info.name);
   r->write(info.flags);
   return r;
@@ -502,6 +503,8 @@ int32_t ResponseParser::parse_monitor_list_all(shared_ptr<Caps> &caps,
     MonitorListItem &i = infos.back();
     if (sub->read(i.id) != CAPS_SUCCESS)
       return -1;
+    if (sub->read(i.pid) != CAPS_SUCCESS)
+      return -1;
     if (sub->read(i.name) != CAPS_SUCCESS)
       return -1;
     if (sub->read(i.flags) != CAPS_SUCCESS)
@@ -517,6 +520,8 @@ int32_t ResponseParser::parse_monitor_list_add(shared_ptr<Caps> &caps,
   if (caps->read(sub) != CAPS_SUCCESS)
     return -1;
   if (sub->read(info.id) != CAPS_SUCCESS)
+    return -1;
+  if (sub->read(info.pid) != CAPS_SUCCESS)
     return -1;
   if (sub->read(info.name) != CAPS_SUCCESS)
     return -1;
