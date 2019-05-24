@@ -47,8 +47,8 @@ public:
 
 class ResponseSerializer {
 public:
-  static int32_t serialize_auth(int32_t result, void *data, uint32_t size,
-                                uint32_t flags);
+  static int32_t serialize_auth(int32_t result, uint32_t version, void *data,
+                                uint32_t size, uint32_t flags);
 
   static int32_t serialize_post(const char *name, uint32_t msgtype,
                                 std::shared_ptr<Caps> &args, uint64_t tag,
@@ -138,7 +138,8 @@ public:
 
 class ResponseParser {
 public:
-  static int32_t parse_auth(std::shared_ptr<Caps> &caps, int32_t &result);
+  static int32_t parse_auth(std::shared_ptr<Caps> &caps, int32_t &result,
+                            uint32_t &version);
 
   static int32_t parse_post(std::shared_ptr<Caps> &caps, std::string &name,
                             uint32_t &msgtype, std::shared_ptr<Caps> &args,
