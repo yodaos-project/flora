@@ -59,6 +59,8 @@ public:
   int32_t call(const char *name, std::shared_ptr<Caps> &msg, const char *target,
                std::function<void(int32_t, Response &)> &cb, uint32_t timeout);
 
+  int get_socket() const;
+
 private:
   int32_t auth(const std::string &extra, uint32_t flags);
 

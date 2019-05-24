@@ -264,6 +264,13 @@ void Agent::recv_call(const char *name, shared_ptr<Caps> &msg,
 
 void Agent::disconnected() { destroy_client(); }
 
+int Agent::get_socket() const {
+  auto cli = flora_cli;
+  if (cli)
+    return cli->get_socket();
+  return -1;
+}
+
 } // namespace flora
 
 using namespace flora;

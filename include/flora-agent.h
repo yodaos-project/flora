@@ -92,6 +92,8 @@ public:
 
   void disconnected();
 
+  int get_socket() const;
+
 private:
   void run();
 

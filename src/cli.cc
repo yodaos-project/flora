@@ -598,6 +598,13 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
   return call(name, msg, target, cb, timeout);
 }
 
+int Client::get_socket() const {
+  auto conn = static_pointer_cast<SocketConn>(connection);
+  if (conn)
+    return conn->get_socket();
+  return -1;
+}
+
 bool Client::handle_monitor_list_all(shared_ptr<Caps> &resp) {
   vector<MonitorListItem> items;
   if (ResponseParser::parse_monitor_list_all(resp, items) < 0) {
