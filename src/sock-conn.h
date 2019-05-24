@@ -22,7 +22,9 @@ public:
 
   void close() override;
 
-  bool closed() const override { return !sock_ready; }
+  inline bool closed() const override { return !sock_ready; }
+
+  inline int get_socket() const { return sock; }
 
 private:
   int sock = -1;

@@ -110,6 +110,8 @@ public:
                        std::function<void(int32_t, Response &)> &cb,
                        uint32_t timeout = 0) = 0;
 
+  virtual int get_socket() const = 0;
+
   static int32_t connect(const char *uri, ClientCallback *cb,
                          uint32_t msg_buf_size,
                          std::shared_ptr<Client> &result);

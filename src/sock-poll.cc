@@ -5,6 +5,7 @@
 #include <chrono>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -94,13 +95,28 @@ int32_t SocketPoll::do_poll(fd_set *rfds, int max_fd) {
 static int unix_accept(int lfd) {
   sockaddr_un addr;
   socklen_t addr_len = sizeof(addr);
-  return accept(lfd, (sockaddr *)&addr, &addr_len);
+#ifdef __APPLE__
+  auto fd = accept(lfd, (sockaddr *)&addr, &addr_len);
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+  return fd;
+#else
+  return accept4(lfd, (sockaddr *)&addr, &addr_len, SOCK_CLOEXEC);
+#endif
 }
 
 static int tcp_accept(int lfd, uint64_t& tag) {
   sockaddr_in addr;
   socklen_t addr_len = sizeof(addr);
+#ifdef __APPLE__
   auto fd = accept(lfd, (sockaddr *)&addr, &addr_len);
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+#else
+  auto fd = accept4(lfd, (sockaddr *)&addr, &addr_len, SOCK_CLOEXEC);
+#endif
   if (fd < 0)
     return fd;
   tag = TagHelper::create(addr);
@@ -182,9 +198,18 @@ shared_ptr<Adapter> SocketPoll::do_accept(int lfd) {
 }
 
 bool SocketPoll::init_unix_socket() {
-  int fd = socket(PF_UNIX, SOCK_STREAM, 0);
+#ifdef __APPLE__
+  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+#else
+  int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#endif
   if (fd < 0)
     return false;
+#ifdef __APPLE__
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+#endif
   struct sockaddr_un addr;
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
@@ -201,9 +226,18 @@ bool SocketPoll::init_unix_socket() {
 }
 
 bool SocketPoll::init_tcp_socket() {
-  int fd = socket(PF_INET, SOCK_STREAM, 0);
+#ifdef __APPLE__
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+#else
+  int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#endif
   if (fd < 0)
     return false;
+#ifdef __APPLE__
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+#endif
   int v = 1;
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
   struct sockaddr_in addr;

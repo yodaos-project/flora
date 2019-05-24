@@ -23,11 +23,20 @@ SocketConn::~SocketConn() {
 }
 
 bool SocketConn::connect(const std::string &name) {
+#ifdef __APPLE__
   int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+#else
+  int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#endif
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
     return false;
   }
+#ifdef __APPLE__
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+#endif
   // set socket recv timeout
   if (recv_timeout > 0) {
     struct timeval tv;
@@ -50,11 +59,20 @@ bool SocketConn::connect(const std::string &name) {
 }
 
 bool SocketConn::connect(const std::string &host, int32_t port) {
+#ifdef __APPLE__
   int fd = socket(AF_INET, SOCK_STREAM, 0);
+#else
+  int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+#endif
   if (fd < 0) {
     KLOGE(TAG, "socket create failed: %s", strerror(errno));
     return false;
   }
+#ifdef __APPLE__
+  auto f = fcntl(fd, F_GETFD);
+  f |= FD_CLOEXEC;
+  fcntl(fd, F_SETFD, f);
+#endif
   // set socket recv timeout
   if (recv_timeout > 0) {
     struct timeval tv;
