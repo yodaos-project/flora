@@ -137,6 +137,9 @@ private:
   AdapterInfoMap monitors;
   uint32_t flags;
   bool working = false;
+  // debug
+  uint32_t exec_cmd_no = 0;
+  std::weak_ptr<Adapter> exec_cmd_sender;
 
   static bool (Dispatcher::*msg_handlers[MSG_HANDLER_COUNT])(
       std::shared_ptr<Caps> &, std::shared_ptr<Adapter> &);
