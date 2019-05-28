@@ -11,6 +11,7 @@ using namespace std;
 using namespace std::chrono;
 
 #define DEFAULT_CALL_TIMEOUT 200
+#define MAX_CMD_QUEUE_SIZE 4000
 
 uint32_t AdapterInfo::idseq;
 
@@ -48,7 +49,8 @@ bool Dispatcher::put(const void *data, uint32_t size,
   }
 
   cmd_mutex.lock();
-  cmd_packets.push_back(make_pair(msg_caps, sender));
+  if (cmd_packets.size() < MAX_CMD_QUEUE_SIZE)
+    cmd_packets.push_back(make_pair(msg_caps, sender));
   cmd_cond.notify_one();
   cmd_mutex.unlock();
   return true;

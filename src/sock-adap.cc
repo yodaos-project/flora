@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 using namespace std;
@@ -15,6 +16,10 @@ SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
   buffer = (int8_t *)mmap(NULL, bufsize, PROT_READ | PROT_WRITE,
                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   buf_size = bufsize;
+  struct timeval tv;
+  tv.tv_sec = 5;
+  tv.tv_usec = 0;
+  setsockopt(socketfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 }
 
 SocketAdapter::~SocketAdapter() { close(); }
@@ -91,12 +96,38 @@ bool SocketAdapter::closed() {
   return buffer == nullptr;
 }
 
+static void printHexBin(const char* data, uint32_t size) {
+  string con;
+  char buf[8];
+  uint32_t i;
+  for (i = 0; i < size; ++i) {
+    snprintf(buf, sizeof(buf), " 0x%02x", data[i]);
+    con += buf;
+  }
+  KLOGW(TAG, "%s", con.c_str());
+}
+
 void SocketAdapter::write(const void *data, uint32_t size) {
   lock_guard<mutex> locker(write_mutex);
   if (buffer == nullptr)
     return;
-  if (::write(socketfd, data, size) < 0) {
-    KLOGE(TAG, "write to socket failed: %s", strerror(errno));
-    close_nolock();
-  }
+  do {
+    if (::write(socketfd, data, size) < 0) {
+      if (errno == EWOULDBLOCK) {
+        uint32_t pid = 0;
+        string name;
+        if (info) {
+          pid = info->pid;
+          name = info->name;
+        }
+        KLOGW(TAG, "write to client <%d>%s timeout\nwrite data %u bytes:",
+            pid, name.c_str(), size);
+        printHexBin((const char*)data, size);
+        continue;
+      }
+      KLOGE(TAG, "write to socket failed: %s", strerror(errno));
+      close_nolock();
+    }
+    break;
+  } while (true);
 }
