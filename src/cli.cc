@@ -17,6 +17,12 @@ thread_local uint64_t flora::internal::Client::tag = 0;
 thread_local string flora::internal::Client::sender_name;
 
 static bool ignore_sigpipe = false;
+static bool crash_signal = false;
+
+static void crash_signal_handler(int sig) {
+  *(int*)nullptr = 0;
+}
+
 int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
                                flora::MonitorCallback *mcb,
                                flora::ClientOptions *opts,
@@ -24,6 +30,11 @@ int32_t flora::Client::connect(const char *uri, flora::ClientCallback *ccb,
   if (!ignore_sigpipe) {
     signal(SIGPIPE, SIG_IGN);
     ignore_sigpipe = true;
+  }
+  // for test
+  if (!crash_signal) {
+    signal(SIGUSR2, crash_signal_handler);
+    crash_signal = true;
   }
 
   ClientOptions defopts;
