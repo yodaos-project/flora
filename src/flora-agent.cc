@@ -116,7 +116,7 @@ void Agent::start(bool block) {
 }
 
 void Agent::run() {
-  unique_lock<mutex> locker(conn_mutex);
+  unique_lock<mutex> locker(conn_mutex, defer_lock);
   shared_ptr<Client> cli;
   flora::ClientOptions cliopts;
 
@@ -131,14 +131,18 @@ void Agent::run() {
       KLOGI(TAG,
             "connect to flora service %s failed, retry after %u milliseconds",
             options.uri.c_str(), options.reconn_interval.count());
+      locker.lock();
       start_cond.notify_one();
       conn_cond.wait_for(locker, options.reconn_interval);
+      locker.unlock();
     } else {
       KLOGI(TAG, "flora service %s connected", options.uri.c_str());
       init_cli(cli);
+      locker.lock();
       flora_cli = cli;
       start_cond.notify_one();
       conn_cond.wait(locker);
+      locker.unlock();
     }
   }
 }
@@ -236,6 +240,7 @@ int32_t Agent::call(const char *name, shared_ptr<Caps> &msg, const char *target,
 
 void Agent::destroy_client() {
   conn_mutex.lock();
+  flora_cli.reset();
   conn_cond.notify_one();
   conn_mutex.unlock();
 }
