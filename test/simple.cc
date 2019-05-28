@@ -74,3 +74,23 @@ TEST(SimpleTest, postInstant) {
   EXPECT_EQ(inst.num[0] + inst.num[1], 78 + 99);
   EXPECT_EQ(inst.num[0] == 78 || inst.num[0] == 99, true);
 }
+
+TEST(SimpleTest, readBlock) {
+  Agent rcv, snd;
+
+  string uri = Service::floraUri;
+  snd.config(FLORA_AGENT_CONFIG_URI, (uri + "#read-block-snd").c_str());
+  rcv.config(FLORA_AGENT_CONFIG_URI, (uri + "#read-block-rcv").c_str());
+  rcv.subscribe("foo", [](const char*, shared_ptr<Caps>&, uint32_t) {
+    while (true) {
+      sleep(10000);
+    }
+  });
+  rcv.start();
+  snd.start();
+  auto msg = Caps::new_instance();
+  msg->write(0);
+  while (true) {
+    snd.post("foo", msg);
+  }
+}
