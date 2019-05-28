@@ -11,7 +11,6 @@ using namespace std;
 using namespace std::chrono;
 
 #define DEFAULT_CALL_TIMEOUT 200
-#define MAX_PENDING_CMDS 200
 
 uint32_t AdapterInfo::idseq;
 
@@ -49,16 +48,7 @@ bool Dispatcher::put(const void *data, uint32_t size,
   }
 
   cmd_mutex.lock();
-  if (cmd_packets.size() < MAX_PENDING_CMDS)
-    cmd_packets.push_back(make_pair(msg_caps, sender));
-  else {
-    KLOGW(TAG, "flora service may blocking!! pending commands queue full(%d), executing command number %u",
-          cmd_packets.size(), exec_cmd_no);
-    auto sender = exec_cmd_sender.lock();
-    if (sender && sender->info) {
-      KLOGW(TAG, "executing cmd sender: %s, pid %d", sender->info->name.c_str(), sender->info->pid);
-    }
-  }
+  cmd_packets.push_back(make_pair(msg_caps, sender));
   cmd_cond.notify_one();
   cmd_mutex.unlock();
   return true;
@@ -132,12 +122,8 @@ void Dispatcher::handle_cmd(shared_ptr<Caps> &msg_caps,
     sender->close();
     return;
   }
-  // debug
-  ++exec_cmd_no;
-  exec_cmd_sender = sender;
   if (!(this->*(msg_handlers[cmd]))(msg_caps, sender))
     sender->close();
-  exec_cmd_sender.reset();
 }
 
 void Dispatcher::pending_call_timeout(PendingCall &pc) {
@@ -235,8 +221,6 @@ void Dispatcher::do_erase_adapter(shared_ptr<Adapter> &sender) {
     KLOGI(TAG, "erase adapter <%d>:%s", sender->info->pid,
           sender->info->name.c_str());
     write_monitor_list_remove(sender->info->id);
-    // debug
-    sender->info = nullptr;
     adapter_infos.erase(reinterpret_cast<intptr_t>(sender.get()));
   }
 }
