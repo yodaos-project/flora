@@ -176,7 +176,14 @@ void Client::recv_loop() {
       break;
     }
     if (!handle_received(rbuf_off + c)) {
-      err = FLORA_CLI_ECONN;
+      if (auth_result != nullptr) {
+        err = FLORA_CLI_EAUTH;
+        auth_result->amutex.lock();
+        auth_result->acond.notify_one();
+        auth_result->amutex.unlock();
+        auth_result = nullptr;
+      } else
+        err = FLORA_CLI_ECONN;
       break;
     }
   }
@@ -217,10 +224,12 @@ bool Client::handle_received(int32_t size) {
 bool Client::handle_cmd_before_auth(int32_t cmd, shared_ptr<Caps> &resp) {
   if (cmd != CMD_AUTH_RESP)
     return false;
+  int32_t result;
   uint32_t version;
   lock_guard<mutex> locker(auth_result->amutex);
-  if (ResponseParser::parse_auth(resp, auth_result->result, version) < 0)
+  if (ResponseParser::parse_auth(resp, result, version) < 0)
     return false;
+  auth_result->result = result;
   auth_result->acond.notify_one();
   cmd_handler = &Client::handle_cmd_after_auth;
   return true;
