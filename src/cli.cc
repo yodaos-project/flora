@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <algorithm>
 
 using namespace std;
 using namespace std::chrono;
