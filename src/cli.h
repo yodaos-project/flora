@@ -119,6 +119,7 @@ private:
     int32_t result = FLORA_CLI_EAUTH;
   };
   AuthResult *auth_result = nullptr;
+  std::mutex send_mutex;
 
   typedef bool (flora::internal::Client::*MonitorHandler)(
       std::shared_ptr<Caps> &);

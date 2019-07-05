@@ -272,6 +272,7 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
     int32_t rescode;
     PendingRequestList::iterator it;
     Response response;
+    RespCallback cb;
 
     if (ResponseParser::parse_reply(resp, msgid, rescode, response, tag) != 0) {
       KLOGW(TAG, "parse reply failed");
@@ -294,16 +295,15 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
           if (rescode != FLORA_CLI_SUCCESS) {
             response.ret_code = 0;
           }
-          auto cb = (*it).callback;
+          cb = (*it).callback;
           pending_requests.erase(it);
-          req_mutex.unlock();
-          cb(rescode, response);
-          req_mutex.lock();
         }
         break;
       }
     }
     req_mutex.unlock();
+    if (cb)
+      cb(rescode, response);
     break;
   }
   case CMD_MONITOR_RESP: {
@@ -346,6 +346,7 @@ void Client::keepalive_loop() {
 }
 
 void Client::ping() {
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_ping(sbuffer, options.bufsize,
                                                 serialize_flags);
   if (c <= 0)
@@ -358,6 +359,7 @@ void Client::iclose(bool passive, int32_t err) {
     return;
   connection->close();
 
+  vector<RespCallback> cbs;
   req_mutex.lock();
   close_reason = err;
   req_reply_cond.notify_all();
@@ -366,7 +368,7 @@ void Client::iclose(bool passive, int32_t err) {
   while (it != pending_requests.end()) {
     Response resp;
     if ((*it).result == nullptr) {
-      (*it).callback(err, resp);
+      cbs.push_back(it->callback);
       rmit = it;
       ++it;
       pending_requests.erase(rmit);
@@ -375,6 +377,10 @@ void Client::iclose(bool passive, int32_t err) {
     ++it;
   }
   req_mutex.unlock();
+  for_each(cbs.begin(), cbs.end(), [err](RespCallback cb) {
+    Response resp;
+    cb(err, resp);
+  });
 
   ka_mutex.lock();
   ka_cond.notify_one();
@@ -402,6 +408,7 @@ int32_t Client::close(bool passive) {
 
 void Client::send_reply(int32_t callid, int32_t code,
                         std::shared_ptr<Caps> &data) {
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_reply(
       callid, code, data, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -414,6 +421,7 @@ int32_t Client::subscribe(const char *name) {
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_subscribe(
       name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -433,6 +441,7 @@ int32_t Client::unsubscribe(const char *name) {
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_unsubscribe(
       name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -452,6 +461,7 @@ int32_t Client::declare_method(const char *name) {
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_declare_method(
       name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -471,6 +481,7 @@ int32_t Client::remove_method(const char *name) {
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_remove_method(
       name, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -491,6 +502,7 @@ int32_t Client::post(const char *name, shared_ptr<Caps> &msg,
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_post(
       name, msgtype, msg, sbuffer, options.bufsize, serialize_flags);
   if (c <= 0)
@@ -515,6 +527,7 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
     return FLORA_CLI_EMONITOR;
   if (this_thread::get_id() == callback_thr_id)
     return FLORA_CLI_EDEADLOCK;
+  unique_lock<mutex> sndlocker(send_mutex);
   int32_t c = RequestSerializer::serialize_call(
       name, msg, target, ++reqseq, timeout, sbuffer, options.bufsize,
       serialize_flags);
@@ -535,6 +548,7 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
   if (!connection->send(sbuffer, c)) {
     return FLORA_CLI_ECONN;
   }
+  sndlocker.unlock();
 #ifdef FLORA_DEBUG
   ++req_times;
   req_bytes += c;
@@ -575,6 +589,7 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
     return FLORA_CLI_EINVAL;
   if (options.flags & FLORA_CLI_FLAG_MONITOR)
     return FLORA_CLI_EMONITOR;
+  lock_guard<mutex> locker(send_mutex);
   int32_t c = RequestSerializer::serialize_call(
       name, msg, target, ++reqseq, timeout, sbuffer, options.bufsize,
       serialize_flags);
