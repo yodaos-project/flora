@@ -17,6 +17,7 @@ include (${CUSTOM_CMAKE_MODULES}/common.mk)
 
 option(BUILD_DEBUG "debug or release" OFF)
 option(BUILD_TEST "build tests" OFF)
+option(DEBUG_FOR_YODAV8 "debug for yoda v8" OFF)
 
 function(parseLogLevel varName)
 if (NOT ${varName})
@@ -114,7 +115,13 @@ target_include_directories(flora-svc PRIVATE
 target_link_libraries(flora-svc
   ${mutils_LIBRARIES}
 )
-target_compile_options(flora-svc PRIVATE -DROKID_LOG_ENABLED=${SVC_LOGLEVEL})
+if (DEBUG_FOR_YODAV8)
+  set(YODA_V8_DEBUG_FLAGS -DDEBUG_FOR_YODAV8)
+endif()
+target_compile_options(flora-svc PRIVATE
+  -DROKID_LOG_ENABLED=${SVC_LOGLEVEL}
+  ${YODA_V8_DEBUG_FLAGS}
+)
 
 set(flora_cli_SOURCES
   include/flora-cli.h

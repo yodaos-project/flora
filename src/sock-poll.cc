@@ -17,6 +17,8 @@ using namespace std;
 
 #define POLL_TYPE_UNIX 0
 #define POLL_TYPE_TCP 1
+#define TCP_SOCK_WRITE_TIMEOUT 4000
+#define UNIX_SOCK_WRITE_TIMEOUT 800
 
 namespace flora {
 namespace internal {
@@ -265,7 +267,8 @@ bool SocketPoll::init_tcp_socket() {
 
 shared_ptr<Adapter> SocketPoll::new_adapter(int fd) {
   shared_ptr<SocketAdapter> adap = make_shared<SocketAdapter>(
-      fd, max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0);
+      fd, max_msg_size, type == POLL_TYPE_TCP ? CAPS_FLAG_NET_BYTEORDER : 0,
+      type == POLL_TYPE_TCP ? TCP_SOCK_WRITE_TIMEOUT : UNIX_SOCK_WRITE_TIMEOUT);
   if (fd >= max_fd)
     max_fd = fd + 1;
   FD_SET(fd, &all_fds);

@@ -4,6 +4,7 @@
 #include "flora-svc.h"
 #include "rlog.h"
 #include "ser-helper.h"
+#include "file-log.h"
 #include <signal.h>
 #include <sys/mman.h>
 
@@ -56,6 +57,11 @@ bool Dispatcher::put(const void *data, uint32_t size,
 
 void Dispatcher::run(bool blocking) {
   signal(SIGPIPE, SIG_IGN);
+#ifdef DEBUG_FOR_YODAV8
+  auto writer = new FileLogWriter();
+  RLog::add_endpoint("fatal", writer);
+  RLog::enable_endpoint("fatal", nullptr, true);
+#endif
   working = true;
   if (blocking) {
     handle_cmds();
@@ -130,7 +136,11 @@ void Dispatcher::pending_call_timeout(PendingCall &pc) {
   int32_t c = ResponseSerializer::serialize_reply(pc.cliid, FLORA_CLI_ETIMEOUT,
                                                   nullptr, 0, buffer, buf_size,
                                                   pc.sender->serialize_flags);
-  pc.sender->write(buffer, c);
+  if (pc.sender->write(buffer, c) == -2) {
+    KLOGW(FILE_TAG, "write timeout: pending call timeout, [0x%llx]%s >>> [0x%llx]%s",
+        pc.sender->tag, pc.sender->info ? pc.sender->info->name.c_str() : "",
+        pc.target->tag, pc.target->info ? pc.target->info->name.c_str() : "");
+  }
 }
 
 void Dispatcher::discard_pending_calls() {
@@ -200,7 +210,10 @@ bool Dispatcher::handle_auth_req(shared_ptr<Caps> &msg_caps,
       result, FLORA_VERSION, buffer, buf_size, sender->serialize_flags);
   if (c < 0)
     return false;
-  sender->write(buffer, c);
+  if (sender->write(buffer, c) == -2) {
+    KLOGW(FILE_TAG, "write timeout: auth resp, >>> [0x%llx]%s",
+        sender->tag, extra.c_str());
+  }
   if (result == FLORA_CLI_SUCCESS) {
     write_monitor_data(flags, sender);
     if ((flags & FLORA_CLI_FLAG_MONITOR) == 0) {
@@ -256,7 +269,10 @@ bool Dispatcher::handle_subscribe_req(shared_ptr<Caps> &msg_caps,
     if (c > 0) {
       KLOGI(TAG, ">>> %s: dispatch persist msg %s", sender->info->name.c_str(),
             name.c_str());
-      sender->write(buffer, c);
+      if (sender->write(buffer, c) == -2) {
+        KLOGW(FILE_TAG, "write timeout: SUB persist msg, >>> [0x%llx]%s",
+            sender->tag, sender->info ? sender->info->name.c_str() : "");
+      }
     }
   }
   return true;
@@ -384,7 +400,11 @@ void Dispatcher::write_post_msg_to_adapters(
   while (ait != adapters.end()) {
     KLOGI(TAG, "%s >>> %s: post %u..%s", sender_name,
           (*ait)->info->name.c_str(), type, name.c_str());
-    (*ait)->write(buffer, c);
+    if ((*ait)->write(buffer, c) == -2) {
+      KLOGW(FILE_TAG, "write timeout: post msg, [0x%llx]%s >>> %s",
+          (*ait)->tag, (*ait)->info ? (*ait)->info->name.c_str() : "",
+          sender_name);
+    }
     ++ait;
   }
 }
@@ -435,7 +455,11 @@ bool Dispatcher::handle_call_req(shared_ptr<Caps> &msg_caps,
       return false;
     KLOGI(TAG, ">>> %s: call %d/%s failed. target %s not existed",
           sender->info->name.c_str(), cliid, name.c_str(), target.c_str());
-    sender->write(buffer, c);
+    if (sender->write(buffer, c) == -2) {
+      KLOGW(FILE_TAG, "write timeout: call but target not existed, [0x%llx]%s >>> %s",
+          sender->tag, sender->info ? sender->info->name.c_str() : "",
+          target.c_str());
+    }
     return true;
   }
   int32_t svrid = ++reqseq;
@@ -447,7 +471,11 @@ bool Dispatcher::handle_call_req(shared_ptr<Caps> &msg_caps,
     return false;
   KLOGI(TAG, "%s >>> %s: call %d/%s", sender->info->name.c_str(),
         target.c_str(), svrid, name.c_str());
-  it->second->write(buffer, c);
+  if (it->second->write(buffer, c) == -2) {
+    KLOGW(FILE_TAG, "write timeout: call, [0x%llx]%s >>> [0x%llx]%s",
+        sender->tag, sender->info ? sender->info->name.c_str() : "",
+        it->second->tag, it->second->info ? it->second->info->name.c_str() : "");
+  }
   return true;
 }
 
@@ -485,7 +513,11 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
     return false;
   KLOGI(TAG, "%s >>> %s: reply %d", sender->info->name.c_str(),
         (*it).sender->info->name.c_str(), (*it).cliid);
-  (*it).sender->write(buffer, c);
+  if ((*it).sender->write(buffer, c) == -2) {
+    KLOGW(FILE_TAG, "write timeout: call return, [0x%llx]%s >>> [0x%llx]%s",
+        sender->tag, sender->info ? sender->info->name.c_str() : "",
+        (*it).sender->tag, (*it).sender->info ? (*it).sender->info->name.c_str() : "");
+  }
   pending_calls.erase(it);
   return true;
 }
@@ -500,7 +532,10 @@ bool Dispatcher::handle_ping_req(shared_ptr<Caps> &msg_caps,
   if (c < 0)
     return false;
   KLOGD(TAG, ">>> %s: pong", sender->info->name.c_str());
-  sender->write(buffer, c);
+  if (sender->write(buffer, c) == -2) {
+    KLOGW(FILE_TAG, "write timeout: ping/pong, >>> [0x%llx]%s",
+        sender->tag, sender->info ? sender->info->name.c_str() : "");
+  }
   return true;
 }
 

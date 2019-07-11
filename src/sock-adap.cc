@@ -7,14 +7,25 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <sys/socket.h>
 
 using namespace std;
 
-SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags)
-    : Adapter(flags), socketfd(sock) {
+static void set_write_timeout(int sock, uint32_t timeout) {
+  if (sock < 0)
+    return;
+  struct timeval tv;
+  tv.tv_sec = timeout / 1000;
+  tv.tv_usec = (timeout % 1000) * 1000;
+  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+}
+
+SocketAdapter::SocketAdapter(int sock, uint32_t bufsize, uint32_t flags,
+    uint32_t wtimeout) : Adapter(flags), socketfd(sock) {
   buffer = (int8_t *)mmap(NULL, bufsize, PROT_READ | PROT_WRITE,
                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
   buf_size = bufsize;
+  set_write_timeout(sock, wtimeout);
 }
 
 SocketAdapter::~SocketAdapter() { close(); }
@@ -91,12 +102,17 @@ bool SocketAdapter::closed() {
   return buffer == nullptr;
 }
 
-void SocketAdapter::write(const void *data, uint32_t size) {
+int32_t SocketAdapter::write(const void *data, uint32_t size) {
   lock_guard<mutex> locker(write_mutex);
   if (buffer == nullptr)
-    return;
-  if (::write(socketfd, data, size) < 0) {
+    return -1;
+  auto r = ::write(socketfd, data, size);
+  if (r < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
     close_nolock();
+    if (errno == EAGAIN)
+      return -2;
+    return -1;
   }
+  return 0;
 }

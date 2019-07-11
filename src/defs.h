@@ -43,3 +43,4 @@
 #endif
 
 #define TAG "flora"
+#define FILE_TAG "flora.filelog"

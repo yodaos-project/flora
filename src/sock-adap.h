@@ -17,7 +17,7 @@
 
 class SocketAdapter : public Adapter {
 public:
-  SocketAdapter(int sock, uint32_t bufsize, uint32_t flags);
+  SocketAdapter(int sock, uint32_t bufsize, uint32_t flags, uint32_t wto);
 
   ~SocketAdapter();
 
@@ -27,7 +27,11 @@ public:
 
   int32_t next_frame(Frame &frame) override;
 
-  void write(const void *data, uint32_t size) override;
+  // return:
+  //     0  success
+  //     -1 socket error
+  //     -2 write timeout
+  int32_t write(const void *data, uint32_t size) override;
 
   void close() override;
 
