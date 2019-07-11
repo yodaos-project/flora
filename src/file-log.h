@@ -4,6 +4,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 #include "rlog.h"
 #include "defs.h"
 
