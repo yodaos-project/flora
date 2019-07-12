@@ -276,11 +276,11 @@ shared_ptr<Adapter> SocketPoll::new_adapter(int fd) {
 }
 
 void SocketPoll::delete_adapter(shared_ptr<Adapter> &adap) {
-  dispatcher->erase_adapter(adap);
   int fd = static_pointer_cast<SocketAdapter>(adap)->socket();
   adap->close();
   FD_CLR(fd, &all_fds);
   ::close(fd);
+  dispatcher->erase_adapter(adap);
 }
 
 bool SocketPoll::do_read(shared_ptr<Adapter> &adap) {

@@ -502,6 +502,11 @@ bool Dispatcher::handle_reply_req(shared_ptr<Caps> &msg_caps,
           sender->info->name.c_str(), svrid);
     return true;
   }
+  if (it->sender->closed()) {
+    KLOGI(TAG, "<<< %s: reply %d failed. caller disconnected",
+        sender->info->name.c_str(), svrid);
+    return true;
+  }
   Response resp;
   resp.ret_code = ret_code;
   resp.data = data;
