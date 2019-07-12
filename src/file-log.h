@@ -27,7 +27,7 @@ public:
   bool write(const char* data, uint32_t size) {
     if (fileName.empty())
       return false;
-    auto fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    auto fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd < 0)
       return false;
     auto r = ::write(fd, data, size);
