@@ -401,9 +401,9 @@ void Dispatcher::write_post_msg_to_adapters(
     KLOGI(TAG, "%s >>> %s: post %u..%s", sender_name,
           (*ait)->info->name.c_str(), type, name.c_str());
     if ((*ait)->write(buffer, c) == -2) {
-      KLOGW(FILE_TAG, "write timeout: post msg, [0x%llx]%s >>> %s",
-          (*ait)->tag, (*ait)->info ? (*ait)->info->name.c_str() : "",
-          sender_name);
+      KLOGW(FILE_TAG, "write timeout: post msg, [0x%llx]%s >>> [0x%llx]%s",
+          tag, sender_name, (*ait)->tag,
+          (*ait)->info ? (*ait)->info->name.c_str() : "");
     }
     ++ait;
   }
