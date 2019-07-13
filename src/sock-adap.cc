@@ -110,8 +110,10 @@ int32_t SocketAdapter::write(const void *data, uint32_t size) {
   if (r < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
     close_nolock();
-    if (errno == EAGAIN)
+    if (errno == EAGAIN) {
+      ::shutdown(socketfd, SHUT_RDWR);
       return -2;
+    }
     return -1;
   }
   return 0;

@@ -165,6 +165,8 @@ void SocketPoll::run() {
           if (it != adapters.end()) {
             KLOGD(TAG, "read from fd %d", ifd);
             if (!do_read(it->second)) {
+              KLOGD(TAG, "delete adapter %s",
+                  it->second->info ? it->second->info->name.c_str() : "");
               delete_adapter(it->second);
               adapters.erase(it);
             }
