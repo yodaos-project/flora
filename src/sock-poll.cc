@@ -17,8 +17,8 @@ using namespace std;
 
 #define POLL_TYPE_UNIX 0
 #define POLL_TYPE_TCP 1
-#define TCP_SOCK_WRITE_TIMEOUT 5000
-#define UNIX_SOCK_WRITE_TIMEOUT 4000
+#define TCP_SOCK_WRITE_TIMEOUT 4000
+#define UNIX_SOCK_WRITE_TIMEOUT 800
 
 namespace flora {
 namespace internal {
