@@ -128,8 +128,10 @@ int32_t SocketConn::recv(void *data, uint32_t size) {
   do {
     c = ::read(sock, data, size);
     if (c < 0) {
-      if (errno == EAGAIN)
+      if (errno == EAGAIN) {
+        KLOGI(TAG, "read socket timeout");
         return -2;
+      }
       if (errno == EINTR) {
         KLOGE(TAG, "read socket failed: %s", strerror(errno));
         continue;

@@ -90,6 +90,8 @@ void SocketAdapter::close_nolock() {
   if (buffer) {
     munmap(buffer, buf_size);
     buffer = nullptr;
+    if (socketfd >= 0)
+      ::shutdown(socketfd, SHUT_RDWR);
 #ifdef FLORA_DEBUG
     KLOGI(TAG, "socket adapter %s: recv times = %u, recv bytes = %u",
           info ? info->name.c_str() : "", recv_times, recv_bytes);
@@ -110,10 +112,8 @@ int32_t SocketAdapter::write(const void *data, uint32_t size) {
   if (r < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
     close_nolock();
-    if (errno == EAGAIN) {
-      ::shutdown(socketfd, SHUT_RDWR);
+    if (errno == EAGAIN)
       return -2;
-    }
     return -1;
   }
   return 0;
