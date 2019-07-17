@@ -25,6 +25,8 @@
 // monitor模式下，不可调用subscribe/declare_method/post/call
 #define FLORA_CLI_EMONITOR -10
 
+#define FLORA_CALL_RETCODE_NORESP -2000000000
+
 #define FLORA_MSGTYPE_INSTANT 0
 #define FLORA_MSGTYPE_PERSIST 1
 #define FLORA_NUMBER_OF_MSGTYPE 2

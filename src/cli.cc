@@ -744,28 +744,33 @@ bool Client::handle_monitor_call(shared_ptr<Caps> &resp) {
 ReplyImpl::ReplyImpl(shared_ptr<Client> &&c, int32_t id)
     : client(c), callid(id) {}
 
-ReplyImpl::~ReplyImpl() noexcept { end(); }
+ReplyImpl::~ReplyImpl() noexcept { send(); }
 
 void ReplyImpl::write_code(int32_t code) { ret_code = code; }
 
 void ReplyImpl::write_data(shared_ptr<Caps> &data) { this->data = data; }
 
 void ReplyImpl::end() {
-  if (client != nullptr) {
-    client->send_reply(callid, ret_code, data);
-    client.reset();
-  }
+  write_code(0);
+  send();
 }
 
 void ReplyImpl::end(int32_t code) {
   write_code(code);
-  end();
+  send();
 }
 
 void ReplyImpl::end(int32_t code, std::shared_ptr<Caps> &data) {
   write_code(code);
   write_data(data);
-  end();
+  send();
+}
+
+void ReplyImpl::send() {
+  if (client != nullptr) {
+    client->send_reply(callid, ret_code, data);
+    client.reset();
+  }
 }
 
 } // namespace internal

@@ -157,8 +157,11 @@ public:
   void end(int32_t code, std::shared_ptr<Caps> &data);
 
 private:
+  void send();
+
+private:
   std::shared_ptr<Client> client;
-  int32_t ret_code = FLORA_CLI_SUCCESS;
+  int32_t ret_code = FLORA_CALL_RETCODE_NORESP;
   std::shared_ptr<Caps> data;
   int32_t callid = 0;
 };
