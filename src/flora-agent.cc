@@ -115,7 +115,8 @@ void Agent::start(bool block) {
   }
 }
 
-static void clean_gabages(list<shared_ptr<Client> >& gabages) {
+void Agent::clean_gabages(list<shared_ptr<Client> >& gabages) {
+  lock_guard<mutex> locker(cg_mutex);
   auto it = gabages.begin();
   while (it != gabages.end()) {
     auto cli = *it;
@@ -190,10 +191,12 @@ void Agent::close() {
     post_handlers.clear();
     call_handlers.clear();
     locker.unlock();
+    cg_mutex.lock();
     if (cli != nullptr && cli->close(false) == FLORA_CLI_EDEADLOCK) {
       thread tmp([cli]() { cli->close(false); });
       tmp.detach();
     }
+    cg_mutex.unlock();
     if (run_thread.joinable())
       run_thread.join();
   }

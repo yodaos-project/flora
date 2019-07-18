@@ -3,6 +3,7 @@
 #include "caps.h"
 #include "flora-cli.h"
 #include <stdarg.h>
+#include <list>
 
 /**
  * flora client代理工具
@@ -101,6 +102,8 @@ private:
 
   void destroy_client();
 
+  void clean_gabages(std::list<std::shared_ptr<Client> >& gabages);
+
 private:
   class Options {
   public:
@@ -123,6 +126,7 @@ private:
   std::condition_variable start_cond;
   std::shared_ptr<Client> flora_cli;
   std::thread run_thread;
+  std::mutex cg_mutex;
   bool working = false;
 };
 
