@@ -115,27 +115,9 @@ void Agent::start(bool block) {
   }
 }
 
-static void clean_gabages(list<shared_ptr<Client> >& gabages) {
-  auto it = gabages.begin();
-  while (it != gabages.end()) {
-    auto cli = *it;
-    if (cli) {
-      static_pointer_cast<flora::internal::Client>(cli)->close(false);
-      if (cli.use_count() == 1) {
-        cli.reset();
-        it = gabages.erase(it);
-      } else
-        ++it;
-    } else {
-      ++it;
-    }
-  }
-}
-
 void Agent::run() {
   unique_lock<mutex> locker(conn_mutex, defer_lock);
-  shared_ptr<Client> cli;
-  list<shared_ptr<Client> > gabages;
+  shared_ptr<Client> cli, gabage;
   flora::ClientOptions cliopts;
 
   cliopts.bufsize = options.bufsize;
@@ -156,14 +138,13 @@ void Agent::run() {
       KLOGI(TAG, "flora service %s connected", options.uri.c_str());
       init_cli(cli);
       locker.lock();
-      gabages.push_back(cli);
       flora_cli.swap(cli);
       start_cond.notify_one();
       conn_cond.wait(locker);
-      flora_cli.reset();
+      gabage.swap(flora_cli);
     }
     locker.unlock();
-    clean_gabages(gabages);
+    gabage.reset();
   }
 }
 
