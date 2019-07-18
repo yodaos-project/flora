@@ -104,8 +104,9 @@ bool SocketConn::connect(const std::string &host, int32_t port) {
 
 bool SocketConn::send(const void *data, uint32_t size) {
   lock_guard<mutex> locker(write_mutex);
-  if (!sock_ready)
+  if (!sock_ready) {
     return false;
+  }
   ssize_t c = ::write(sock, data, size);
   if (c < 0) {
     KLOGE(TAG, "write to socket failed: %s", strerror(errno));
