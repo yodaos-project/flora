@@ -248,7 +248,9 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
       return false;
     }
     if (cli_callback) {
+      KLOGW(TAG, "received post msg <<<<<<<< %s", name.c_str());
       cli_callback->recv_post(name.c_str(), msgtype, args);
+      KLOGW(TAG, "received post msg ^^^^^^^^ %s", name.c_str());
     }
     break;
   }
@@ -263,7 +265,9 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
     if (cli_callback) {
       shared_ptr<Reply> reply =
           make_shared<ReplyImpl>(this_weak_ptr.lock(), msgid);
+      KLOGW(TAG, "received method call <<<<<<<< %s", name.c_str());
       cli_callback->recv_call(name.c_str(), args, reply);
+      KLOGW(TAG, "received method call ^^^^^^^^ %s", name.c_str());
     }
     break;
   }
@@ -280,6 +284,7 @@ bool Client::handle_cmd_after_auth(int32_t cmd, shared_ptr<Caps> &resp) {
       return false;
     }
 
+    KLOGW(TAG, "method return ^^^^^^^^ %d", msgid);
     req_mutex.lock();
     for (it = pending_requests.begin(); it != pending_requests.end(); ++it) {
       if ((*it).id == msgid) {
@@ -546,12 +551,14 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
       pending_requests.emplace(pending_requests.end());
   (*it).id = reqseq;
   (*it).result = &reply;
+  auto debugId = reqseq;
   locker.unlock();
 
   if (!connection->send(sbuffer, c)) {
     return FLORA_CLI_ECONN;
   }
   sndlocker.unlock();
+  KLOGW(TAG, "sync method call >>>>>>>> %d.%s", debugId, name);
 #ifdef FLORA_DEBUG
   ++req_times;
   req_bytes += c;
@@ -574,6 +581,7 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
 
     auto wr = req_reply_cond.wait_until(locker, tp);
     if (wr == cv_status::timeout) {
+      KLOGW(TAG, "sync method call timeout ^^^^^^^^ %d.%s", debugId, name);
       retcode = FLORA_CLI_ETIMEOUT;
       break;
     }
@@ -616,6 +624,7 @@ int32_t Client::call(const char *name, shared_ptr<Caps> &msg,
   ++send_times;
   send_bytes += c;
 #endif
+  KLOGW(TAG, "async method call >>>>>>>> %d.%s", reqseq, name);
   return FLORA_CLI_SUCCESS;
 }
 
