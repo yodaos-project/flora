@@ -16,7 +16,7 @@
 namespace flora {
 namespace internal {
 
-typedef std::list<std::shared_ptr<Adapter>> AdapterList;
+typedef std::list<std::weak_ptr<Adapter>> AdapterList;
 typedef std::map<std::string, AdapterList> SubscriptionMap;
 typedef struct {
   std::shared_ptr<Caps> data;
@@ -121,6 +121,10 @@ private:
 
   void write_monitor_list_remove(uint32_t id);
 
+  void check_subscriptions();
+
+  void clear_sub_gabages();
+
 private:
   SubscriptionMap subscriptions;
   PersistMsgMap persist_msgs;
@@ -136,6 +140,13 @@ private:
   AdapterInfoMap adapter_infos;
   AdapterInfoMap monitors;
   uint32_t flags;
+  // if now timepoint more than handle_cmd_tp 10 seconds when erase adapter
+  // traversal map of subscriptions, clear gabages
+  std::chrono::steady_clock::time_point handle_cmd_tp;
+  // the variable +1 for each erased adapter
+  // if the variable >= CLEAR_SUBSCRIPTION_THRESHOLD,
+  // traversal map of subscriptions, clear gabages
+  uint32_t clear_sub_prio{0};
   bool working = false;
 
   static bool (Dispatcher::*msg_handlers[MSG_HANDLER_COUNT])(
