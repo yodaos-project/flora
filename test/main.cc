@@ -20,6 +20,6 @@ int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   auto r = RUN_ALL_TESTS();
   svc.stop();
-  Service::thrPool.close();
+  Service::thrPool.clear();
   return r;
 }

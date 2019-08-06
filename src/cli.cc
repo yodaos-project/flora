@@ -396,8 +396,8 @@ void Client::iclose(bool passive, int32_t err) {
 }
 
 int32_t Client::close(bool passive) {
-  if (connection == nullptr || connection->closed())
-    return FLORA_CLI_SUCCESS;
+  // if (connection == nullptr || connection->closed())
+  //   return FLORA_CLI_SUCCESS;
   if (this_thread::get_id() == callback_thr_id)
     return FLORA_CLI_EDEADLOCK;
   iclose(passive, FLORA_CLI_ECLOSED);
