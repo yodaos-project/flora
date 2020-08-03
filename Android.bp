@@ -1,0 +1,46 @@
+cc_library_shared {
+  name: "libflora-cli",
+  srcs: [
+    "src/cli.cpp",
+    "src/common.cpp",
+  ],
+  local_include_dirs: [
+    "include",
+  ],
+  export_include_dirs: [
+    "include",
+  ],
+  shared_libs: [
+    "libmutils",
+    "libcaps",
+  ],
+  cflags: [
+    "-std=c++11",
+    "-fexceptions",
+    "-Wno-unused-parameter",
+  ],
+}
+
+cc_library_shared {
+  name: "libflora-svc",
+  srcs: [
+    "src/svc.cpp",
+    "src/common.cpp",
+  ],
+  local_include_dirs: [
+    "include",
+  ],
+  export_include_dirs: [
+    "include",
+  ],
+  shared_libs: [
+    "libmutils",
+    "libcaps",
+  ],
+  cflags: [
+    "-std=c++11",
+    "-fexceptions",
+    "-Wno-unused-parameter",
+    "-DTRACE_COMMANDS",
+  ],
+}
