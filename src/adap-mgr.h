@@ -51,8 +51,12 @@ public:
     if (multiThread)
       amMutex.lock();
     auto adap = make_shared<ServiceSocketAdapter>(bm, fd, type);
+#ifdef NDEBUG
+    adapters.insert(make_pair(fd, adap));
+#else
     auto r = adapters.insert(make_pair(fd, adap));
     assert(r.second);
+#endif
     if (multiThread)
       amMutex.unlock();
     return adap;

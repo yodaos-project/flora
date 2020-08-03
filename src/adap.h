@@ -274,7 +274,7 @@ public:
     auto fl = fcntl(fd, F_GETFL);
     fl |= O_NONBLOCK;
     fcntl(fd, F_SETFL, fl);
-    bool r;
+    bool r = false;
     if (sockType == 0)
       r = connectUnix(fd, urip);
     else if (sockType == 1)
