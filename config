@@ -1,0 +1,114 @@
+#!/bin/bash
+
+function print_prompt
+{
+  cat << CONFEOF
+Usage: $0 [OPTION]... [VAR=VALUE]...
+
+Configuration:
+    --help                      display this help and exit
+    --debug                     build for debug
+    --test                      build unit-tests
+    --build-static              generate static libraries
+    --build-shared              generate shared libraries
+    --build-dir=DIR             build directory
+    --prefix=PREFIX             install prefix
+    --cmake-modules=DIR         directory of cmake modules file exist
+    --find-root-path=DIR        root dir for search dependencies libs
+    --svc-log-level=*           log level of flora service(verbose|debug|info|warning|error|none)
+    --cli-log-level=*           log level of flora client(verbose|debug|info|warning|error|none)
+    --use-epoll                 switch of epoll/poll in flora service
+    --no-trace-commands         switch of print detail of req/resp commands in flora service
+
+Dependencies:
+    --mutils=DIR                specify mutils install dir
+    --caps=DIR                  specify caps install dir
+    --gtest=DIR                 specify gtest install dir
+
+Cross Compile:
+    --toolchain=DIR             toolchain install dir
+    --cross-prefix=PREFIX       compiler name prefix
+CONFEOF
+}
+
+builddir="build"
+cmake_modules_dir="cmake"
+
+CMAKE_ARGS=
+for conf_opt
+do
+  case $conf_opt in
+    *=?*) conf_optarg=`expr "X$conf_opt" : '[^=]*=\(.*\)'` ;;
+    *) conf_optarg= ;;
+  esac
+
+  case $conf_opt in
+    --help)
+      print_prompt
+      exit 0
+      ;;
+    --debug)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_DEBUG=ON)
+      ;;
+    --test)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_TEST=ON)
+      ;;
+    --build-dir=*)
+      builddir=$conf_optarg
+      ;;
+    --build-static)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_STATIC=ON)
+      ;;
+    --build-shared)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DBUILD_SHARED=ON)
+      ;;
+    --prefix=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCMAKE_INSTALL_PREFIX=$conf_optarg)
+      ;;
+    --cmake-modules=*)
+      cmake_modules_dir=$conf_optarg
+      ;;
+    --svc-log-level=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DSVC_LOGLEVEL=$conf_optarg)
+      ;;
+    --cli-log-level=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCLI_LOGLEVEL=$conf_optarg)
+      ;;
+    --use-epoll)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DUSE_EPOLL=ON)
+      ;;
+    --no-trace-commands)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DTRACE_COMMANDS=OFF)
+      ;;
+    --mutils=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DmutilsPrefix=$conf_optarg)
+      ;;
+    --caps=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DcapsPrefix=$conf_optarg)
+      ;;
+    --gtest=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DgtestPrefix=$conf_optarg)
+      ;;
+    --toolchain=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DTOOLCHAIN_HOME=$conf_optarg)
+      CROSS_COMPILE=yes
+      ;;
+    --cross-prefix=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCROSS_PREFIX=$conf_optarg)
+      ;;
+    --find-root-path=*)
+      CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCMAKE_FIND_ROOT_PATH=$conf_optarg)
+      ;;
+  esac
+done
+
+CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCUSTOM_CMAKE_MODULES=$cmake_modules_dir)
+CUR_DIR=`pwd`
+if [ x$CROSS_COMPILE = x"yes" ]; then
+CMAKE_ARGS=(${CMAKE_ARGS[@]} -DCMAKE_TOOLCHAIN_FILE=$cmake_modules_dir/toolchain.cmake)
+fi
+
+mkdir -p $builddir
+cd $builddir
+cmake $CUR_DIR \
+  ${CMAKE_ARGS[@]}
