@@ -75,7 +75,7 @@ public:
 
 bool isValidIdentify(const string& id);
 
-void beReadU32(const char* in, uint32_t& v);
+void beReadU32(const uint8_t* in, uint32_t& v);
 
 void printGlobalError();
 

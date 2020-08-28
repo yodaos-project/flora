@@ -28,7 +28,7 @@ bool isValidIdentify(const string& id) {
   return true;
 }
 
-void beReadU32(const char* in, uint32_t& v) {
+void beReadU32(const uint8_t* in, uint32_t& v) {
   v = in[0] << 24;
   v |= in[1] << 16;
   v |= in[2] << 8;

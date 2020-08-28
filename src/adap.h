@@ -47,7 +47,7 @@ protected:
     if (size < sizeof(uint32_t))
       return 1;
     uint32_t csz;
-    beReadU32(readBuffer + readPos, csz);
+    beReadU32((uint8_t*)(readBuffer + readPos), csz);
     if (csz > bufsize) {
       ROKID_GERROR(STAG, FLORA_SVC_ENOBUF,
           "adapter read buffer not enough, need %u, bufsize %u",
