@@ -186,6 +186,11 @@ public:
     callbackSlots[idx].handle = handle;
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)InstantCallback(cb);
+    // 如果已连接，则马上发送订阅请求
+    unique_lock<mutex> locker(cliMutex);
+    if (status & STATUS_READY)
+      doSubscribe(callbackSlots[idx]);
+    locker.unlock();
     return handle;
   }
 
@@ -199,6 +204,11 @@ public:
     callbackSlots[idx].handle = handle;
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)PersistCallback(cb);
+    // 如果已连接，则马上发送订阅请求
+    unique_lock<mutex> locker(cliMutex);
+    if (status & STATUS_READY)
+      doSubscribe(callbackSlots[idx]);
+    locker.unlock();
     return handle;
   }
 
@@ -214,6 +224,11 @@ public:
     callbackSlots[idx].name = name;
     callbackSlots[idx].target = target;
     new (callbackSlots[idx].stdfunc)StatusCallback(cb);
+    // 如果已连接，则马上发送订阅请求
+    unique_lock<mutex> locker(cliMutex);
+    if (status & STATUS_READY)
+      doSubscribe(callbackSlots[idx]);
+    locker.unlock();
     return handle;
   }
 
@@ -238,6 +253,11 @@ public:
     callbackSlots[idx].handle = handle;
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)MethodCallback(cb);
+    // 如果已连接，则马上发送订阅请求
+    unique_lock<mutex> locker(cliMutex);
+    if (status & STATUS_READY)
+      doSubscribe(callbackSlots[idx]);
+    locker.unlock();
     return handle;
   }
 
@@ -587,11 +607,17 @@ private:
 
   bool doSubscribe() {
     for (size_t i = 0; i < callbackSlots.size(); ++i) {
-      if (CallbackSlot::isValidSubHandle(callbackSlots[i].handle)) {
-        auto type = CallbackSlot::typeOfSubHandle(callbackSlots[i].handle);
-        if (!(this->*(subscribeFuncs[type]))(callbackSlots[i]))
-          return false;
-      }
+      if (!doSubscribe(callbackSlots[i]))
+        return false;
+    }
+    return true;
+  }
+
+  bool doSubscribe(CallbackSlot& slot) {
+    if (CallbackSlot::isValidSubHandle(slot.handle)) {
+      auto type = CallbackSlot::typeOfSubHandle(slot.handle);
+      if (!(this->*(subscribeFuncs[type]))(slot))
+        return false;
     }
     return true;
   }
