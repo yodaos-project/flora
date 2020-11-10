@@ -8,6 +8,7 @@
 
 #define SUBHANDLE_MAGIC 0x10000000
 #define CONNECT_TIMEOUT 10000
+#define AUTH_TIMEOUT 10000
 #define STATUS_RUNNING 1
 #define STATUS_READY 2
 #define STATUS_CLOSING 4
@@ -166,9 +167,6 @@ public:
       options.bufsize = va_arg(ap, uint32_t);
       if (options.bufsize < MIN_BUFSIZE)
         options.bufsize = MIN_BUFSIZE;
-      break;
-    case ClientOptions::NORESP_TIMEOUT:
-      options.norespTimeout = va_arg(ap, uint32_t);
       break;
     case ClientOptions::SYNC:
       options.sync = va_arg(ap, uint32_t);
@@ -476,7 +474,7 @@ public:
       locker.unlock();
       goto failed;
     }
-    adapter->setReadTimeout(options.norespTimeout);
+    adapter->setReadTimeout(AUTH_TIMEOUT);
     if (!auth()) {
       locker.lock();
       adapter->close();
@@ -485,6 +483,7 @@ public:
       locker.unlock();
       goto failed;
     }
+    adapter->setReadTimeout(-1);
     locker.lock();
     if (status & STATUS_CLOSING) {
       adapter->close();

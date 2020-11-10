@@ -17,7 +17,6 @@ enum class ClientOptions {
   URI,
   ID,
   BUFSIZE,
-  NORESP_TIMEOUT,
   SYNC
 };
 
