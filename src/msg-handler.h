@@ -172,7 +172,7 @@ public:
     try {
       it >> retCode;
       it >> callid;
-      if (retCode == FLORA_SVC_SUCCESS)
+      if (retCode == FLORA_SVC_SUCCESS && it.hasNext())
         it >> value;
     } catch (exception& e) {
       invalidCommand(data);
