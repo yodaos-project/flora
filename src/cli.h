@@ -366,7 +366,7 @@ public:
 
   bool callAsync(const string& name, const string& callee,
       const Caps* args, uint32_t timeout, ReturnCallback cb) {
-    lock_guard<mutex> locker(cliMutex);
+    unique_lock<mutex> locker(cliMutex);
     if (!checkReady())
       return false;
     if (!checkIdentify(name) || !checkIdentify(callee))
@@ -376,6 +376,7 @@ public:
       eraseCallbackSlot(handle, false);
       return false;
     }
+    locker.unlock();
     clientLooper.addAsyncCall(self, handle, timeout);
     return true;
   }
