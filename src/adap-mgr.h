@@ -43,8 +43,30 @@ typedef list<PendingCall> PendingCallList;
 // name#1       persist subscribe key
 class AdapterManager {
 public:
-  void init(bool mthr) {
+  void init(bool mthr, ThreadPool* tp) {
     multiThread = mthr;
+    thrPool = tp;
+    // pendingCalls超时计时
+    thrPool->push([this]() {
+      unique_lock<mutex> locker{pcMutex};
+      while (true) {
+        auto nowtp = steady_clock::now();
+        auto it = pendingCalls.begin();
+        // 超时后简单删除PendingCall对象，不向call请求客户端发送timeout消息
+        // 因为客户端有自己的超时清理机制，不需要服务端发送timeout消息
+        while (it != pendingCalls.end()) {
+          if (nowtp >= it->expireTime)
+            it = pendingCalls.erase(it);
+          else
+            break;
+        }
+        if (pendingCalls.empty()) {
+          pcCond.wait(locker);
+        } else {
+          pcCond.wait_until(locker, pendingCalls.begin()->expireTime);
+        }
+      }
+    });
   }
 
   shared_ptr<ServiceAdapter> newAdapter(FixedBufferManager* bm, int fd, int type) {
@@ -188,9 +210,8 @@ public:
 
   uint32_t addPendingCall(shared_ptr<ServiceAdapter>& caller, uint32_t reqid,
       uint32_t timeout) {
-    auto tp = steady_clock::now() + milliseconds(timeout);
-    if (multiThread)
-      amMutex.lock();
+    auto tp = steady_clock::now() + milliseconds(timeout + 1);
+    lock_guard<mutex> locker{pcMutex};
     auto it = pendingCalls.begin();
     while (it != pendingCalls.end()) {
       if (tp <= it->expireTime)
@@ -198,20 +219,21 @@ public:
       ++it;
     }
     auto callid = ++callIdSeq;
-    pendingCalls.emplace(it, caller, reqid, callid, tp);
-    if (multiThread)
-      amMutex.unlock();
+    it = pendingCalls.emplace(it, caller, reqid, callid, tp);
+    // 如果插入的pending call是最先超时的，则通知超时计时线程
+    if (it == pendingCalls.begin())
+      pcCond.notify_one();
     return callid;
   }
 
-  bool findPendingCall(uint32_t callid, PendingCall& res) {
-    unique_lock<mutex> locker(amMutex, defer_lock);
-    if (multiThread)
-      locker.lock();
+  bool findPendingCall(uint32_t callid, PendingCall& res, bool remove) {
+    lock_guard<mutex> locker{pcMutex};
     auto it = pendingCalls.begin();
     while (it != pendingCalls.end()) {
       if (it->callid == callid) {
         res = *it;
+        if (remove)
+          pendingCalls.erase(it);
         return true;
       }
       ++it;
@@ -397,6 +419,9 @@ private:
 
   bool multiThread;
   mutable mutex amMutex;
+  // pending call list mutex & cond
+  mutex pcMutex;
+  condition_variable pcCond;
   AdapterMap adapters;
   NamedAdapterMap namedAdapters;
   MsgSubscriptionMap subscriptions;
@@ -404,4 +429,5 @@ private:
   MsgValueMap msgValues;
   PendingCallList pendingCalls;
   uint32_t callIdSeq{0};
+  ThreadPool* thrPool = nullptr;
 };

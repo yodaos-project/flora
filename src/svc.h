@@ -69,18 +69,20 @@ public:
   }
 
   bool start(bool blocking) {
+    // 阻塞模式时，当前线程算一个读线程
+    // 再加一个pendingCall超时计时线程
+    uint32_t threadNum = (options.readThreadNum > 1 ? options.readThreadNum : 0)
+          + options.writeThreadNum + 1;
+    if (!blocking)
+      ++threadNum;
+    thrPool.init(threadNum);
     if (!init())
       return false;
-    // 阻塞模式时，当前线程算一个读线程
-    uint32_t threadNum = (options.readThreadNum > 1 ? options.readThreadNum : 0)
-          + options.writeThreadNum;
     status = SERVICE_STATUS_RUNNING;
     if (blocking) {
-      thrPool.init(threadNum);
       run();
       return true;
     }
-    thrPool.init(threadNum + 1);
     thrPool.push([this]() { run(); });
     return true;
   }
@@ -100,7 +102,7 @@ private:
     if (!startListening())
       return false;
     // 读线程数大于1，需要保证线程安全
-    adapterManager.init(options.readThreadNum > 1);
+    adapterManager.init(options.readThreadNum > 1, &thrPool);
     msgHandler.init(adapterManager, msgWriter);
     bufferManager.init(options.bufsize, options.readThreadNum > 1);
     msgWriter.init(options.writeThreadNum, &bufferManager, &adapterManager);

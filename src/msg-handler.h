@@ -180,7 +180,7 @@ public:
     }
     TRACE_REQ_CMD(sender, data);
     PendingCall callInfo;
-    if (!adapterManager->findPendingCall(callid, callInfo)) {
+    if (!adapterManager->findPendingCall(callid, callInfo, true)) {
       KLOGI(STAG, "pending call %u not exists", callid);
       return true;
     }
