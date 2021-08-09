@@ -97,7 +97,6 @@ public:
   /// \param opt 指定要配置的选项
   /// \note ClientOptions::ID string类型, 客户端唯一标识
   /// \note ClientOptions::URI string类型, 服务端uri
-  /// \note 多次调用config(ClientOptions::URI, ...) 可配置多个uri
   /// \note unix socket uri 例: "unix:flora"
   /// \note tcp socket uri 例: "tcp://127.0.0.1:37710/"
   /// \note ClientOptions::SYNC int32_t类型, 默认0. 0(异步) 1(同步)
