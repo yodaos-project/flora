@@ -138,9 +138,11 @@ private:
       if (urip.scheme == "unix") {
         if (!listenUnix(urip))
           goto failed;
+        KLOGI(STAG, "listen %s", it->c_str());
       } else if(urip.scheme == "tcp") {
         if (!listenTcp(urip))
           goto failed;
+        KLOGI(STAG, "listen %s", it->c_str());
       } else {
         KLOGW(STAG, "uri %s's scheme is invalid", it->c_str());
         ++it;

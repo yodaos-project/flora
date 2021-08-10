@@ -65,8 +65,13 @@ ClientLooper::ClientLooper() {
       auto cli = wcli.lock();
       inactiveClients.pop_front();
       locker.unlock();
-      if (cli != nullptr && cli->connect() == 0)
-        addPollClient(wcli);
+      if (cli != nullptr) {
+        if (cli->connect() == 0)
+          addPollClient(wcli);
+        else {
+          KLOGI(CTAG, "%s", ROKID_GERROR_STRING);
+        }
+      }
     }
   };
   // epoll线程

@@ -296,9 +296,9 @@ public:
           struct timeval tv;
           tv.tv_sec = (timeout - elapsed) / 1000;
           tv.tv_usec = (timeout - elapsed) % 1000 * 1000;
-          sr = select(fd + 1, &fdset, nullptr, nullptr, &tv);
+          sr = select(fd + 1, nullptr, &fdset, nullptr, &tv);
         } else {
-          sr = select(fd + 1, &fdset, nullptr, nullptr, nullptr);
+          sr = select(fd + 1, nullptr, &fdset, nullptr, nullptr);
         }
         if (sr >= 0)
           break;

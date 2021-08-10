@@ -467,6 +467,7 @@ public:
     adapter = make_shared<ClientSocketAdapter>(options.bufsize);
     status = STATUS_RUNNING;
     locker.unlock();
+    KLOGI(CTAG, "connect to %s", options.uri.c_str());
     if (!adapter->connect(urip, CONNECT_TIMEOUT)) {
       locker.lock();
       adapter->close();
