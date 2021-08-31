@@ -95,6 +95,7 @@ public:
 #else
     wakeupPoll();
 #endif
+    thrPool.finish();
   }
 
 private:
@@ -306,6 +307,7 @@ failed:
     }
     closeSockets();
     adapterManager.clearAdapters();
+    adapterManager.close();
     msgWriter.finish();
   }
 

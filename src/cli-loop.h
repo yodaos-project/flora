@@ -89,6 +89,10 @@ public:
     }
   }
 
+  void close() {
+    thrPool.finish();
+  }
+
 private:
   void addPollClient(weak_ptr<ClientImpl>& cli) {
     lock_guard<mutex> locker(pollMutex);

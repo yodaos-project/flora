@@ -44,12 +44,13 @@ typedef list<PendingCall> PendingCallList;
 class AdapterManager {
 public:
   void init(bool mthr, ThreadPool* tp) {
+    working = true;
     multiThread = mthr;
     thrPool = tp;
     // pendingCalls超时计时
     thrPool->push([this]() {
       unique_lock<mutex> locker{pcMutex};
-      while (true) {
+      while (working) {
         auto nowtp = steady_clock::now();
         auto it = pendingCalls.begin();
         // 超时后简单删除PendingCall对象，不向call请求客户端发送timeout消息
@@ -67,6 +68,12 @@ public:
         }
       }
     });
+  }
+
+  void close() {
+    lock_guard<mutex> locker(pcMutex);
+    working = false;
+    pcCond.notify_one();
   }
 
   shared_ptr<ServiceAdapter> newAdapter(FixedBufferManager* bm, int fd, int type) {
@@ -418,6 +425,7 @@ private:
   typedef map<string, Caps> MsgValueMap;
 
   bool multiThread;
+  bool working = false;
   mutable mutex amMutex;
   // pending call list mutex & cond
   mutex pcMutex;

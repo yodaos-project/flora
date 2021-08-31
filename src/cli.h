@@ -425,6 +425,7 @@ public:
 
   void close() {
     clientLooper.addToPendingClose(self);
+    clientLooper.close();
   }
 
   void realClose() {
