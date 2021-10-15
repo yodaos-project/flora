@@ -23,11 +23,10 @@ using namespace std::chrono;
 using namespace flora;
 using namespace rokid;
 
-#define DEFAULT_BUFSIZE 32768
 #define MIN_BUFSIZE 4096
 #define SOCKET_TYPE_LISTEN 1
 #define SOCKET_TYPE_TCP 2
-
+#define CLIENT_FLAG_MONITOR 1u
 #define STAG "flora-svc"
 #define CTAG "flora-cli"
 
@@ -127,5 +126,6 @@ bool setSocketTimeout(int socket, int32_t tm, bool rd);
 #define CMD_DEL_STATUS_RESP 108
 #define CMD_UPDATE_PERSIST_RESP 109
 #define CMD_DEL_PERSIST_RESP 110
-#define MAX_RESP_CMD 110
-#define RESP_CMD_COUNT 10
+#define CMD_CONNECTION_INFO_NOTIFY 111
+#define MAX_RESP_CMD 111
+#define RESP_CMD_COUNT 11

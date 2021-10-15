@@ -25,8 +25,8 @@ int main(int argc, char** argv) {
       return 1;
     }
     floraUri = opt->value();
-    service = flora::Service::newInstance();
-    service->config(flora::ServiceOptions::LISTEN_URI, floraUri.c_str());
+    flora::Service::Builder builder;
+    service = builder.addUri(floraUri).build();
     service->start();
   }
   auto r = RUN_ALL_TESTS();

@@ -17,9 +17,10 @@ TEST(FailedTest, callTimeout) {
     uint32_t conn{0};
   } testVars;
 
-  auto callee = Client::newInstance();
-  callee->config(ClientOptions::URI, floraUri.c_str());
-  callee->config(ClientOptions::ID, "callee");
+  Client::Builder builder;
+  auto callee = builder.setUri(floraUri)
+    .setId("callee")
+    .build();
   callee->declareMethod("foo",
       [&testVars](const Caps& data, shared_ptr<Reply>& reply) {
         ++testVars.callFoo;
@@ -28,8 +29,7 @@ TEST(FailedTest, callTimeout) {
       [&testVars](const Caps& data, shared_ptr<Reply>& reply) {
         ++testVars.callBar;
       });
-  auto caller = Client::newInstance();
-  caller->config(ClientOptions::URI, floraUri.c_str());
+  auto caller = builder.setId("").build();
   thrPool.push([&callee, &testVars]() {
     callee->open([&callee, &testVars](bool conn) {
       if (conn) {

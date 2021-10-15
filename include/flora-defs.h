@@ -35,3 +35,5 @@
 #define FLORA_CLI_ENOT_READY -8
 /// 未找到指定远程方法
 #define FLORA_CLI_ENOTFOUND -9
+
+#define FLORA_DEFAULT_BUFSIZE 32768

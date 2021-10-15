@@ -90,6 +90,7 @@ const char* DataTracer::respCmdStr[RESP_CMD_COUNT] = {
   "UPDATE_STATUS",
   "DELETE_STATUS",
   "UPDATE_PERSIST",
-  "DELETE_PERSIST"
+  "DELETE_PERSIST",
+  "CONNECTION_NOTIFY"
 };
 #endif // TRACE_COMMANDS

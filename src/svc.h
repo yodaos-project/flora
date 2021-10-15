@@ -33,9 +33,9 @@ private:
   class Options {
   public:
     vector<string> uris;
-    uint32_t bufsize{DEFAULT_BUFSIZE};
-    uint32_t readThreadNum{1};
-    uint32_t writeThreadNum{1};
+    uint32_t bufsize;
+    uint32_t readThreadNum;
+    uint32_t writeThreadNum;
   };
 
   class ReadTaskStatus {
@@ -47,25 +47,18 @@ private:
   };
 
 public:
-  void config(ServiceOptions opt, va_list ap) {
-    switch (opt) {
-      case ServiceOptions::LISTEN_URI: {
-        auto s = va_arg(ap, const char*);
-        options.uris.emplace_back(s);
-        break;
-      }
-      case ServiceOptions::BUFSIZE:
-        options.bufsize = va_arg(ap, uint32_t);
-        if (options.bufsize < MIN_BUFSIZE)
-          options.bufsize = MIN_BUFSIZE;
-        break;
-      case ServiceOptions::READ_THREAD_NUM:
-        options.readThreadNum = va_arg(ap, uint32_t);
-        break;
-      case ServiceOptions::WRITE_THREAD_NUM:
-        options.writeThreadNum = va_arg(ap, uint32_t);
-        break;
-    }
+  ServiceImpl(const vector<string>& uris, uint32_t bufsize,
+      uint32_t rthnum, uint32_t wthnum) {
+    options.uris = uris;
+    options.bufsize = bufsize;
+    if (options.bufsize < MIN_BUFSIZE)
+      options.bufsize = MIN_BUFSIZE;
+    options.readThreadNum = rthnum;
+    if (options.readThreadNum == 0)
+      options.readThreadNum = 1;
+    options.writeThreadNum = wthnum;
+    if (options.writeThreadNum == 0)
+      options.writeThreadNum = 1;
   }
 
   bool start(bool blocking) {
@@ -510,7 +503,7 @@ failed:
     ::close(fd);
     if (options.readThreadNum > 1)
       readMutex.unlock();
-    adapterManager.eraseAdapter(fd);
+    msgHandler.eraseAdapter(fd);
   }
 
 #ifndef FLORA_USE_EPOLL

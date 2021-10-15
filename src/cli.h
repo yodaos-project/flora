@@ -29,6 +29,11 @@ class CallbackSlotTemp {
 public:
   string name;
   string target;
+  /// ---bits value defines---
+  /// 29-31: CallbackType
+  /// 28: magic bit
+  /// 16-27: reserved
+  /// 0-15: index of CallbackSlot array
   uint32_t handle{0};
   char stdfunc[FSZ];
 
@@ -123,7 +128,15 @@ private:
 
 class ClientImpl : public Client {
 public:
-  ClientImpl() {
+  ClientImpl(const string& id, const string& uri, ConnectionMonitor& mon,
+      uint32_t bufsize, bool sync) {
+    options.id = id;
+    options.uri = uri;
+    options.bufsize = bufsize;
+    if (options.bufsize < MIN_BUFSIZE)
+      options.bufsize = MIN_BUFSIZE;
+    options.sync = sync;
+    connMonitor = mon;
     cmdHandlers[CMD_POST_RESP - MIN_RESP_CMD] = &ClientImpl::handlePost;
     cmdHandlers[CMD_CALL_RESP - MIN_RESP_CMD] = &ClientImpl::handleCall;
     cmdHandlers[CMD_CALL_FORWARD - MIN_RESP_CMD]
@@ -138,6 +151,8 @@ public:
       = &ClientImpl::handleUpdatePersist;
     cmdHandlers[CMD_DEL_PERSIST_RESP - MIN_RESP_CMD]
       = &ClientImpl::handleDeletePersist;
+    cmdHandlers[CMD_CONNECTION_INFO_NOTIFY - MIN_RESP_CMD]
+      = &ClientImpl::handleConnectionNotify;
     subscribeFuncs[(int32_t)CallbackType::INSTANT] = &ClientImpl::doSubscribeInstant;
     subscribeFuncs[(int32_t)CallbackType::PERSIST] = &ClientImpl::doSubscribePersist;
     subscribeFuncs[(int32_t)CallbackType::STATUS] = &ClientImpl::doSubscribeStatus;
@@ -153,25 +168,6 @@ public:
 
   void setSelfPtr(shared_ptr<ClientImpl>& ptr) {
     self = ptr;
-  }
-
-  void config(ClientOptions opt, va_list ap) {
-    switch (opt) {
-    case ClientOptions::URI:
-      options.uri = va_arg(ap, const char*);
-      break;
-    case ClientOptions::ID:
-      options.id = va_arg(ap, const char*);
-      break;
-    case ClientOptions::BUFSIZE:
-      options.bufsize = va_arg(ap, uint32_t);
-      if (options.bufsize < MIN_BUFSIZE)
-        options.bufsize = MIN_BUFSIZE;
-      break;
-    case ClientOptions::SYNC:
-      options.sync = va_arg(ap, uint32_t);
-      break;
-    }
   }
 
   sub_t subscribe(const std::string& name, InstantCallback cb) {
@@ -578,6 +574,7 @@ private:
     Caps req;
     req << CMD_AUTH_REQ;
     req << (uint32_t)FLORA_VERSION;
+    req << (connMonitor == nullptr ? 0u : CLIENT_FLAG_MONITOR);
     if (!options.id.empty())
       req << options.id;
     if (!adapter->write(req))
@@ -913,6 +910,16 @@ private:
     return true;
   }
 
+  bool handleConnectionNotify(Caps::iterator& it) {
+    string name;
+    int32_t conn;
+    it >> name;
+    it >> conn;
+    assert(connMonitor != nullptr);
+    connMonitor(name, conn ? true : false);
+    return true;
+  }
+
   int32_t getHandleIndex(uint32_t handle) {
     if (!CallbackSlot::isValidSubHandle(handle))
       return -1;
@@ -1017,9 +1024,8 @@ private:
   public:
     string uri;
     string id;
-    uint32_t bufsize{DEFAULT_BUFSIZE};
-    uint32_t norespTimeout{50000};
-    uint32_t sync{0};
+    uint32_t bufsize;
+    bool sync;
   };
   typedef bool (ClientImpl::*CommandHandler)(Caps::iterator&);
   typedef bool (ClientImpl::*SubscribeFunc)(CallbackSlot&);
@@ -1040,4 +1046,5 @@ private:
   set<string> declaredMethodNames;
   ConnectionCallback connectionCallback;
   weak_ptr<ClientImpl> self;
+  ConnectionMonitor connMonitor;
 };

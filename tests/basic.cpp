@@ -16,9 +16,10 @@ TEST(BasicTest, subscribe) {
     uint32_t updateBar{0};
     uint32_t removeBar{0};
   } testVars;
-  auto cli = Client::newInstance();
-  cli->config(ClientOptions::URI, floraUri.c_str());
-  cli->config(ClientOptions::SYNC, 1);
+  auto cli = Client::Builder()
+    .setUri(floraUri)
+    .setSync(true)
+    .build();
   cli->subscribe("foo", [&testVars](const Caps& data) {
     ++testVars.recvFoo;
     EXPECT_EQ(data.size(), 2);
@@ -69,10 +70,11 @@ TEST(BasicTest, remoteMethod) {
     uint32_t retBar{0};
     uint32_t conn{0};
   } testVars;
-  auto callee = Client::newInstance();
-  callee->config(ClientOptions::URI, floraUri.c_str());
-  callee->config(ClientOptions::ID, "callee");
-  callee->config(ClientOptions::SYNC, 1);
+  Client::Builder builder;
+  auto callee = builder.setUri(floraUri)
+    .setId("callee")
+    .setSync(true)
+    .build();
   callee->declareMethod("foo",
       [&testVars](const Caps& data, shared_ptr<Reply>& reply) {
     ++testVars.callFoo;
@@ -104,9 +106,10 @@ TEST(BasicTest, remoteMethod) {
     }
   });
 
-  auto caller = Client::newInstance();
-  caller->config(ClientOptions::URI, floraUri.c_str());
-  caller->config(ClientOptions::SYNC, 1);
+  auto caller = builder.setUri(floraUri)
+    .setId("")
+    .setSync(true)
+    .build();
   thrPool.push([&callee, &testVars]() {
     callee->open([&callee, &testVars](int32_t status) {
       if (status == 1) {
@@ -192,13 +195,15 @@ TEST(BasicTest, subscribeStatus) {
     vector<Caps> fooStatus;
     vector<Caps> barStatus;
   } testVars;
-  auto holder = Client::newInstance();
-  auto observer = Client::newInstance();
-  holder->config(ClientOptions::URI, floraUri.c_str());
-  holder->config(ClientOptions::ID, "holder");
-  holder->config(ClientOptions::SYNC, 1);
-  observer->config(ClientOptions::URI, floraUri.c_str());
-  observer->config(ClientOptions::SYNC, 1);
+  Client::Builder builder;
+  auto holder = builder.setUri(floraUri)
+    .setId("holder")
+    .setSync(true)
+    .build();
+  auto observer = builder.setUri(floraUri)
+    .setId("")
+    .setSync(true)
+    .build();
   observer->subscribe("foo", "holder", [&testVars](const Caps* args, bool remove) {
     if (remove)
       ++testVars.removeFoo;
@@ -265,4 +270,83 @@ TEST(BasicTest, subscribeStatus) {
   sleep(1);
   EXPECT_FALSE(testVars.holderConnected);
   EXPECT_FALSE(testVars.observerConnected);
+}
+
+TEST(BasicTest, connMonitor) {
+  class ClientInfo {
+  public:
+    shared_ptr<Client> client;
+    uint32_t connStatus{0};
+  };
+  class ConnMonitorTestVar {
+  public:
+    ClientInfo namedClients[6];
+    ClientInfo annoClients[2];
+
+    ConnMonitorTestVar() {
+      int32_t i;
+      char name[16];
+      Client::Builder builder;
+      builder.setUri(floraUri);
+      auto cb = [](ClientInfo* info, const string& name, bool conn) {
+        auto n = name.substr(5);
+        auto idx = atoi(n.c_str());
+        if (conn)
+          info->connStatus |= (1 << idx);
+        else
+          info->connStatus &= ~(1 << idx);
+      };
+
+      for (i = 0; i < 6; ++i) {
+        snprintf(name, sizeof(name), "test-%d", i);
+        builder.setId(name);
+        builder.setMonitor(nullptr);
+        if (i == 3) {
+          ClientInfo* info = namedClients + i;
+          auto mon = [info, cb](const string& name, bool conn) {
+            cb(info, name, conn);
+          };
+          builder.setMonitor(mon);
+        }
+        namedClients[i].client = builder.build();
+      }
+      builder.setId("");
+      annoClients[0].client = builder.build();
+      ClientInfo* info = annoClients + 1;
+      auto mon = [info, cb](const string& name, bool conn) {
+        cb(info, name, conn);
+      };
+      builder.setMonitor(mon);
+      annoClients[1].client = builder.build();
+    }
+  };
+  ConnMonitorTestVar testVar;
+  int32_t i;
+  for (i = 0; i < 4; ++i) {
+    testVar.namedClients[i].client->open(nullptr);
+  }
+  sleep(1);
+  EXPECT_EQ(testVar.namedClients[3].connStatus, 15);
+  for (i = 4; i < 6; ++i) {
+    testVar.namedClients[i].client->open(nullptr);
+  }
+  sleep(1);
+  EXPECT_EQ(testVar.namedClients[3].connStatus, 15 + 16 + 32);
+  testVar.annoClients[0].client->open(nullptr);
+  testVar.annoClients[1].client->open(nullptr);
+  sleep(1);
+  EXPECT_EQ(testVar.namedClients[3].connStatus, 15 + 16 + 32);
+  EXPECT_EQ(testVar.annoClients[1].connStatus, 15 + 16 + 32);
+  for (i = 0; i < 6; ++i) {
+    if (i != 3)
+      testVar.namedClients[i].client->close();
+  }
+  testVar.annoClients[0].client->close();
+  sleep(1);
+  EXPECT_EQ(testVar.namedClients[3].connStatus, 8);
+  EXPECT_EQ(testVar.annoClients[1].connStatus, 8);
+  testVar.namedClients[3].client->close();
+  sleep(1);
+  EXPECT_EQ(testVar.annoClients[1].connStatus, 0);
+  testVar.annoClients[1].client->close();
 }

@@ -5,8 +5,8 @@
 
 namespace flora {
 
-shared_ptr<Client> Client::newInstance() {
-  auto ret = make_shared<ClientImpl>();
+shared_ptr<Client> Client::Builder::build() {
+  auto ret = make_shared<ClientImpl>(cid, svcUri, connMon, bufsize, sync);
   ret->setSelfPtr(ret);
   return ret;
 }

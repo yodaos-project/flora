@@ -19,19 +19,6 @@ class Caps;
 
 namespace flora {
 
-/// \enum ClientOptions
-/// flora client配置选项，用于config调用
-enum class ClientOptions {
-  /// flora服务uri
-  URI,
-  /// 指定flora客户端id
-  ID,
-  BUFSIZE,
-  /// 是否启用同步模式
-  /// 同步模式open不退出，直到调用close
-  SYNC
-};
-
 typedef uint32_t sub_t;
 typedef uint32_t meth_t;
 /// \brief 普通广播消息回调
@@ -67,6 +54,11 @@ typedef std::function<void(int32_t code, const rokid::Caps& data)> ReturnCallbac
 /// \note FLORA_CLI_ETIMEOUT 连接超时
 /// \note FLORA_CLI_EDUP 配置的id已被其它客户端占用
 typedef std::function<void(int32_t status)> ConnectionCallback;
+/// \brief 监视客户端连接/断开情况的回调
+/// \param id  连接/断开的客户端id
+/// \param conn true 连接  false 断开
+/// \note 匿名客户端连接/断开不回调
+typedef std::function<void(const std::string&, bool)> ConnectionMonitor;
 
 /// \class Reply
 /// 为远程方法调用返回数据
@@ -88,27 +80,55 @@ public:
 /// flora客户端
 class Client {
 public:
+  class Builder {
+  public:
+    /// \brief 设置id, 客户端唯一标识
+    Builder& setId(const std::string& id) {
+      cid = id;
+      return *this;
+    }
+
+    /// \brief 设置flora服务端uri
+    /// \note unix socket uri 例: "unix:flora"
+    /// \note tcp socket uri 例: "tcp://127.0.0.1:37710/"
+    Builder& setUri(const std::string& uri) {
+      svcUri = uri;
+      return *this;
+    }
+
+    /// \brief 设置客户端连接状态监视回调
+    ///
+    /// 监视所有非匿名客户端连接/断开的状态
+    Builder& setMonitor(ConnectionMonitor mon) {
+      connMon = mon;
+      return *this;
+    }
+
+    /// \brief 设置消息缓冲区大小, 决定了一次最大传输的消息数据量. 默认FLORA_DEFAULT_BUFSIZE
+    Builder& setBufsize(uint32_t size) {
+      bufsize = size;
+      return *this;
+    }
+
+    /// \brief 设置客户端阻塞模式, 默认异步
+    /// \param s  false(异步) true(同步)
+    Builder& setSync(bool s) {
+      sync = s;
+      return *this;
+    }
+
+    /// \brief 创建客户端对象
+    std::shared_ptr<Client> build();
+
+  private:
+    std::string cid;
+    std::string svcUri;
+    ConnectionMonitor connMon;
+    uint32_t bufsize{FLORA_DEFAULT_BUFSIZE};
+    bool sync{false};
+  };
+
   virtual ~Client() = default;
-
-  /// \brief 配置客户端
-  /// 在客户端连接前配置
-  /// 连接后再配置暂不生效
-  /// 线程不安全
-  /// \param opt 指定要配置的选项
-  /// \note ClientOptions::ID string类型, 客户端唯一标识
-  /// \note ClientOptions::URI string类型, 服务端uri
-  /// \note unix socket uri 例: "unix:flora"
-  /// \note tcp socket uri 例: "tcp://127.0.0.1:37710/"
-  /// \note ClientOptions::SYNC int32_t类型, 默认0. 0(异步) 1(同步)
-  /// \note ClientOptions::BUFSIZE 消息缓冲区大小, 决定了一次最大传输的消息数据量. int32_t类型, 默认4096
-  void config(ClientOptions opt, ...) {
-    va_list ap;
-    va_start(ap, opt);
-    config(opt, ap);
-    va_end(ap);
-  }
-
-  virtual void config(ClientOptions opt, va_list ap) = 0;
 
   /// \brief 订阅普通广播消息
   /// \param name 消息名
@@ -234,9 +254,6 @@ public:
 
   /// \breif 关闭客户端
   virtual void close() = 0;
-
-  /// \brief 创建客户端对象
-  static std::shared_ptr<Client> newInstance();
 };
 
 } // namespace flora

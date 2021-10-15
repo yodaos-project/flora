@@ -79,9 +79,10 @@ public:
 
   void start() {
     hasExecuted = true;
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "user");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("user")
+      .build();
     cli->subscribe("status", "network", [this](const Caps* data, bool remove) {
       modifyFlags(data, remove, NETWORK_CONNECTED);
     });
@@ -320,9 +321,10 @@ public:
   }
 
   void start() {
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "network");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("network")
+      .build();
     cli->declareMethod("config", [this](const Caps& args, shared_ptr<Reply>& reply) {
       config(args, reply);
     });
@@ -380,9 +382,10 @@ public:
     if (videoStatus)
       return;
     videoStatus = 1;
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "video");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("video")
+      .build();
     cli->declareMethod("stop", [this](const Caps& args, shared_ptr<Reply>& reply) {
       cli->deleteStatus("status");
       cli->close();
@@ -419,9 +422,10 @@ public:
   }
 
   void start() {
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "alarm");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("alarm")
+      .build();
     cli->open([this](int32_t conn) {
       if (conn == 1) {
         Caps data;
@@ -468,9 +472,10 @@ public:
   }
 
   void start() {
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "music");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("music")
+      .build();
     cli->declareMethod("control", [this](const Caps& args, shared_ptr<Reply>& reply) {
       control(args, reply);
     });
@@ -573,9 +578,10 @@ public:
   }
 
   void start() {
-    cli = Client::newInstance();
-    cli->config(ClientOptions::URI, floraUri.c_str());
-    cli->config(ClientOptions::ID, "launcher");
+    Client::Builder builder;
+    cli = builder.setUri(floraUri)
+      .setId("launcher")
+      .build();
     cli->declareMethod("launch", [this](const Caps& args, shared_ptr<Reply>& reply) {
       launch(args, reply);
     });

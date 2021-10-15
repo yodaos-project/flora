@@ -50,9 +50,11 @@ public:
       Caps& data) {
     int32_t res{FLORA_SVC_SUCCESS};
     uint32_t version;
+    uint32_t flags;
     string name;
     try {
       it >> version;
+      it >> flags;
       if (it.hasNext())
         it >> name;
     } catch (exception& e) {
@@ -72,6 +74,16 @@ public:
     resp << CMD_AUTH_RESP;
     resp << res;
     msgWriter->put(sender, resp, res != FLORA_SVC_SUCCESS);
+    if (res == FLORA_SVC_SUCCESS) {
+      if (flags & CLIENT_FLAG_MONITOR) {
+        adapterManager->addMonitorAdapter(sender);
+        // 向当前client发送所有已连接的client信息
+        sendConnectedInfos(sender);
+      }
+      if (!name.empty())
+        // 通知所有monitor, 客户端连接
+        adapterConnectedNotify(sender, 1);
+    }
     return true;
   }
 
@@ -496,6 +508,44 @@ public:
         ++it;
       }
     }
+  }
+
+  void sendConnectedInfos(shared_ptr<ServiceAdapter>& target) {
+    vector<shared_ptr<ServiceAdapter>> adapters;
+    adapterManager->getNamedAdapters(adapters);
+    Caps args;
+    auto it = adapters.begin();
+    while (it != adapters.end()) {
+      args.clear();
+      args << CMD_CONNECTION_INFO_NOTIFY;
+      args << (*it)->name;
+      args << 1;
+      msgWriter->put(target, args, false);
+      ++it;
+    }
+  }
+
+  void adapterConnectedNotify(shared_ptr<ServiceAdapter>& adap, int32_t conn) {
+    vector<shared_ptr<ServiceAdapter>> adapters;
+    adapterManager->getMonitorAdapters(adapters);
+    Caps args;
+    args << CMD_CONNECTION_INFO_NOTIFY;
+    args << adap->name;
+    args << conn;
+    auto it = adapters.begin();
+    while (it != adapters.end()) {
+      if ((*it).get() != adap.get())
+        msgWriter->put(*it, args, false);
+      ++it;
+    }
+  }
+
+  void eraseAdapter(int fd) {
+    auto adap = adapterManager->get(fd);
+    if (!adap->name.empty())
+      // 通知所有monitor，客户端连接断开
+      adapterConnectedNotify(adap, 0);
+    adapterManager->eraseAdapter(fd);
   }
 
 private:

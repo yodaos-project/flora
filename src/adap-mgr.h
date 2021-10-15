@@ -95,6 +95,7 @@ public:
     if (multiThread)
       amMutex.lock();
     adapters.erase(fd);
+    monitorAdapters.erase(fd);
     if (multiThread)
       amMutex.unlock();
   }
@@ -125,6 +126,37 @@ public:
       return true;
     }
     return false;
+  }
+
+  void getNamedAdapters(vector<shared_ptr<ServiceAdapter>>& out) {
+    if (multiThread)
+      amMutex.lock();
+    out.clear();
+    auto it = namedAdapters.begin();
+    while (it != namedAdapters.end()) {
+      auto adap = it->second.lock();
+      if (adap == nullptr) {
+        it = namedAdapters.erase(it);
+        continue;
+      }
+      out.push_back(adap);
+      ++it;
+    }
+    if (multiThread)
+      amMutex.unlock();
+  }
+
+  void getMonitorAdapters(vector<shared_ptr<ServiceAdapter>>& out) {
+    if (multiThread)
+      amMutex.lock();
+    out.clear();
+    auto it = monitorAdapters.begin();
+    while (it != monitorAdapters.end()) {
+      out.push_back(it->second);
+      ++it;
+    }
+    if (multiThread)
+      amMutex.unlock();
   }
 
   void subscribeMsg(shared_ptr<ServiceAdapter>& adap, const string& name,
@@ -318,6 +350,16 @@ public:
     if (multiThread)
       amMutex.lock();
     adapters.clear();
+    monitorAdapters.clear();
+    if (multiThread)
+      amMutex.unlock();
+  }
+
+  void addMonitorAdapter(shared_ptr<ServiceAdapter>& adap) {
+    if (multiThread)
+      amMutex.lock();
+    auto fd = static_cast<ServiceSocketAdapter*>(adap.get())->getSocket();
+    monitorAdapters.insert(make_pair(fd, adap));
     if (multiThread)
       amMutex.unlock();
   }
@@ -432,6 +474,7 @@ private:
   condition_variable pcCond;
   AdapterMap adapters;
   NamedAdapterMap namedAdapters;
+  AdapterMap monitorAdapters;
   MsgSubscriptionMap subscriptions;
   // value of persist msgs and status msgs
   MsgValueMap msgValues;

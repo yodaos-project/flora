@@ -3,9 +3,9 @@
 
 namespace flora {
 
-shared_ptr<Service> Service::newInstance() {
+shared_ptr<Service> Service::Builder::build() {
   signal(SIGPIPE, SIG_IGN);
-  return make_shared<ServiceImpl>();
+  return make_shared<ServiceImpl>(uris, bufsize, readThreadNum, writeThreadNum);
 }
 
 } // namespace flora
