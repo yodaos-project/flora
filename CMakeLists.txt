@@ -146,16 +146,12 @@ endif(BUILD_SHARED)
 
 # unit-tests
 if (BUILD_TEST)
-findPackage(gtest REQUIRED
-  HINTS ${gtestPrefix}
-  HEADERS gtest/gtest.h
-  STATIC_LIBS gtest
-)
+find_package(GTest REQUIRED)
 file(GLOB tests_sources tests/*.cpp)
 add_executable(flora-test ${tests_sources})
 target_include_directories(flora-test PRIVATE
   include
-  ${gtest_INCLUDE_DIRS}
+  ${GTEST_INCLUDE_DIRS}
 )
 if (BUILD_SHARED)
 target_link_libraries(flora-test
@@ -163,7 +159,7 @@ target_link_libraries(flora-test
   flora-svc
   rokid::mutils
   rokid::caps
-  ${gtest_LIBRARIES}
+  ${GTEST_LIBRARY}
 )
 else(BUILD_SHARED)
 target_link_libraries(flora-test
@@ -171,7 +167,7 @@ target_link_libraries(flora-test
   flora-svc-static
   rokid::mutils
   rokid::caps
-  ${gtest_LIBRARIES}
+  ${GTEST_LIBRARY}
 )
 endif(BUILD_SHARED)
 endif(BUILD_TEST)
