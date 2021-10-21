@@ -5,12 +5,12 @@
 #include "thr-pool.h"
 #include "common.h"
 
-// 8-5=3，保留3个线程
+// 保留3个线程
 // 1 用于异步call的超时判断
 // 2 用于所有client sockets epoll
 // 3 用于处理等待关闭的clients队列
 #define MAX_THREAD_NUM 8
-#define MAX_CONNECT_THREAD_NUM 5
+#define MAX_CONNECT_THREAD_NUM 2
 
 class ClientImpl;
 class AsyncCallInfo {
@@ -34,6 +34,7 @@ typedef deque<shared_ptr<ClientImpl>> ClientQueue2;
 class ClientLooper {
 public:
   ClientLooper();
+  ~ClientLooper();
 
   // async call信息放入链表，按超时时间从大到小排序
   // 启动线程进行超时检测
@@ -41,6 +42,8 @@ public:
       uint32_t timeout) {
     auto tp = steady_clock::now() + milliseconds{timeout + 1};
     lock_guard<mutex> locker(asyncCallMutex);
+    if (disableAsyncCallTask)
+      return;
     auto it = asyncCalls.begin();
     while (it != asyncCalls.end()) {
       if (tp >= it->tp)
@@ -87,10 +90,6 @@ public:
         thrPool.push(closeClientRoutine);
       }
     }
-  }
-
-  void close() {
-    thrPool.finish();
   }
 
 private:
@@ -161,15 +160,19 @@ private:
 private:
   ThreadPool thrPool{MAX_THREAD_NUM};
   function<void()> asyncCallRoutine;
-  uint16_t asyncCallTaskRunning = 0;
+  uint8_t asyncCallTaskRunning = 0;
   uint8_t pollTaskRunning = 0;
   uint8_t closeTaskRunning = 0;
+  uint8_t connectingTasks = 0;
+  uint8_t disableAsyncCallTask = 0;
+  uint8_t disableConnectTask = 0;
+  uint8_t disableCloseTask = 0;
+  uint8_t reserved;
   mutex asyncCallMutex;
   condition_variable asyncCallChanged;
   AsyncCallInfoList asyncCalls;
   mutex connMutex;
   ClientQueue inactiveClients;
-  uint32_t connectingTasks = 0;
   function<void()> clientConnectRoutine;
   // 连接并登录的client临时放在此队列
   // 等待被加入epoll

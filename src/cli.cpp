@@ -143,6 +143,35 @@ ClientLooper::ClientLooper() {
   };
 }
 
+ClientLooper::~ClientLooper() {
+  // TODO:
+  asyncCallMutex.lock();
+  disableAsyncCallTask = 1;
+  if (asyncCallTaskRunning) {
+    asyncCalls.clear();
+    asyncCallChanged.notify_one();
+  }
+  asyncCallMutex.unlock();
+
+  connMutex.lock();
+  disableConnectTask = 1;
+  inactiveClients.clear();
+  connMutex.unlock();
+
+  pendingCloseMutex.lock();
+  disableCloseTask = 1;
+  pendingClose.clear();
+  pendingCloseMutex.unlock();
+
+  pollMutex.lock();
+  loginedClients.clear();
+  pollClients.clear();
+  wakeupPoll();
+  pollMutex.unlock();
+
+  thrPool.finish();
+}
+
 void ClientLooper::handleLoginedClients() {
   auto it = loginedClients.begin();
   while (it != loginedClients.end()) {
