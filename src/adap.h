@@ -75,6 +75,9 @@ protected:
 
   virtual bool doRead() = 0;
 
+  // 从socket读取指定字节数
+  virtual bool doReadCount(uint32_t count) = 0;
+
 protected:
   char* readBuffer{nullptr};
   uint32_t readPos{0};
@@ -150,7 +153,6 @@ public:
 
 protected:
   bool doRead() {
-    assert(BASE::readPos == 0);
     auto size = BASE::bufsize - BASE::readDataSize;
     if (size == 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ENOBUF, "adapter read buffer not enough");
@@ -169,6 +171,36 @@ protected:
       return false;
     }
     BASE::readDataSize += c;
+    return true;
+  }
+
+  bool doReadCount(uint32_t count) {
+    auto size = BASE::bufsize - BASE::readDataSize;
+    if (size < count) {
+      ROKID_GERROR(STAG, FLORA_SVC_ENOBUF, "adapter read buffer not enough");
+      return false;
+    }
+    ssize_t c;
+    while (true) {
+      c = ::read(socketfd, BASE::readBuffer + BASE::readDataSize, count);
+      if (c == -1) {
+        if (errno == EINTR)
+          continue;
+        ROKID_GERROR(STAG, FLORA_SVC_ESYS, "read socket failed: %s",
+            strerror(errno));
+        return false;
+      }
+      if (c == 0) {
+        ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket shutdown or remote closed");
+        return false;
+      }
+      BASE::readDataSize += c;
+      if (c < count) {
+        count -= c;
+        continue;
+      }
+      break;
+    }
     return true;
   }
 
@@ -248,6 +280,30 @@ public:
       readDataSize = 0;
     }
     return r;
+  }
+
+  // 从socket读且仅读取一个完整的caps
+  // 阻塞模式
+  bool readOne(Caps& data) {
+    // 此函数仅用于读取第一个回包，即auth回包
+    // 此时readPos, readDataSize必为0
+    assert(readPos == 0);
+    assert(readDataSize == 0);
+    if (!doReadCount(4))
+      return false;
+    uint32_t size;
+    beReadU32((uint8_t*)readBuffer, size);
+    if (!doReadCount(size - 4))
+      return false;
+    try {
+      data.parse(readBuffer, readDataSize);
+    } catch (exception& e) {
+      ROKID_GERROR(STAG, FLORA_SVC_EINVAL,
+          "adapter read failed: invalid caps format");
+      return false;
+    }
+    readDataSize = 0;
+    return true;
   }
 };
 

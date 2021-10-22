@@ -582,11 +582,8 @@ private:
       req << options.id;
     if (!adapter->write(req))
       return false;
-    if (!adapter->read())
-      return false;
     Caps resp;
-    auto r = adapter->read(resp);
-    if (r)
+    if (!adapter->readOne(resp))
       return false;
     auto it = resp.iterate();
     int32_t cmd;
