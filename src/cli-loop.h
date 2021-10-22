@@ -189,4 +189,5 @@ private:
   function<void()> closeClientRoutine;
   mutex pendingCloseMutex;
   ClientQueue2 pendingClose;
+  function<void(shared_ptr<ClientImpl>)> clientReadRoutine;
 };

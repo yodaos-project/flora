@@ -105,17 +105,18 @@ ClientLooper::ClientLooper() {
         } else {
           shared_ptr<ClientImpl> cli;
           locker.lock();
+          // 将socket临时移出epoll，等数据处理完后再加回来
+          // 防止数据处理过程中此fd再次出现epoll read事件
+          // 这样adapter read可以不加锁
+          epoll_ctl(epollfd, EPOLL_CTL_DEL, events[i].data.fd, nullptr);
           auto it = pollClients.find(events[i].data.fd);
           if (it != pollClients.end())
             cli = it->second.lock();
           locker.unlock();
-          if (cli == nullptr || !cli->doReadAdapter()) {
-            if (cli != nullptr)
-              cli->closeSocket();
-            locker.lock();
-            erasePollClient(events[i].data.fd);
-            locker.unlock();
-          }
+          if (cli == nullptr)
+            return;
+          auto task = std::bind(clientReadRoutine, cli);
+          thrPool.push(task);
         }
       }
     }
@@ -123,6 +124,23 @@ ClientLooper::ClientLooper() {
     closeEpoll();
     locker.lock();
     pollTaskRunning = false;
+  };
+  clientReadRoutine = [this](shared_ptr<ClientImpl> cli) {
+    if (!cli->doReadAdapter()) {
+      pollMutex.lock();
+      pollClients.erase(cli->getSocket());
+      pollMutex.unlock();
+      cli->closeSocket();
+      return;
+    }
+    // socket数据处理完，将其加回epoll
+    pollMutex.lock();
+    epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = cli->getSocket();
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, cli->getSocket(), &ev);
+    pollMutex.unlock();
+    wakeupPoll();
   };
   // 关闭Client
   closeClientRoutine = [this]() {
