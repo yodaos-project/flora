@@ -23,6 +23,7 @@ public:
     handlers[CMD_UNSUB_PERSIST_REQ] = &MsgHandler::handleUnsubscribePersist;
     handlers[CMD_UPDATE_PERSIST_REQ] = &MsgHandler::handleUpdatePersist;
     handlers[CMD_DEL_PERSIST_REQ] = &MsgHandler::handleDeletePersist;
+    handlers[CMD_READY_REQ] = &MsgHandler::handleReady;
   }
 
   void init(AdapterManager& mgr, MsgWriter& writer) {
@@ -80,10 +81,17 @@ public:
         // 向当前client发送所有已连接的client信息
         sendConnectedInfos(sender);
       }
-      if (!name.empty())
-        // 通知所有monitor, 客户端连接
-        adapterConnectedNotify(sender, 1);
     }
+    return true;
+  }
+
+  bool handleReady(Caps::iterator& it, shared_ptr<ServiceAdapter>& sender,
+      Caps& data) {
+    if (sender->name.empty())
+      return false;
+    adapterManager->setReady(sender);
+    // 通知所有monitor, 客户端连接状态
+    adapterConnectedNotify(sender, 1);
     return true;
   }
 
@@ -512,7 +520,7 @@ public:
 
   void sendConnectedInfos(shared_ptr<ServiceAdapter>& target) {
     vector<shared_ptr<ServiceAdapter>> adapters;
-    adapterManager->getNamedAdapters(adapters);
+    adapterManager->getReadyAdapters(adapters);
     Caps args;
     auto it = adapters.begin();
     while (it != adapters.end()) {
@@ -534,8 +542,7 @@ public:
     args << conn;
     auto it = adapters.begin();
     while (it != adapters.end()) {
-      if ((*it).get() != adap.get())
-        msgWriter->put(*it, args, false);
+      msgWriter->put(*it, args, false);
       ++it;
     }
   }

@@ -128,6 +128,14 @@ public:
     return false;
   }
 
+  void setReady(shared_ptr<ServiceAdapter>& adap) {
+    if (multiThread)
+      amMutex.lock();
+    TagHelper::setReady(adap->tag);
+    if (multiThread)
+      amMutex.unlock();
+  }
+
   void getNamedAdapters(vector<shared_ptr<ServiceAdapter>>& out) {
     if (multiThread)
       amMutex.lock();
@@ -140,6 +148,25 @@ public:
         continue;
       }
       out.push_back(adap);
+      ++it;
+    }
+    if (multiThread)
+      amMutex.unlock();
+  }
+
+  void getReadyAdapters(vector<shared_ptr<ServiceAdapter>>& out) {
+    if (multiThread)
+      amMutex.lock();
+    out.clear();
+    auto it = namedAdapters.begin();
+    while (it != namedAdapters.end()) {
+      auto adap = it->second.lock();
+      if (adap == nullptr) {
+        it = namedAdapters.erase(it);
+        continue;
+      }
+      if (TagHelper::ready(adap->tag))
+        out.push_back(adap);
       ++it;
     }
     if (multiThread)

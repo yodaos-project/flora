@@ -111,6 +111,14 @@ public:
   void setAuthorized() {
   }
 
+  void setReady() {
+    TagHelper::setReady(tag);
+  }
+
+  bool isReady() const {
+    return TagHelper::ready(tag);
+  }
+
   void addStatus(const string& name) {
     allStatus.insert(name);
   }
@@ -125,11 +133,11 @@ protected:
 public:
   string name;
   // if unix socket
-  // |type|authorized|reserved| pid |
-  // | 63 |    62    |  61~32 | 31~0|
+  // |type|authorized|ready|reserved| pid |
+  // | 63 |    62    |  61 |  62~32 | 31~0|
   // if tcp socket
-  // |type|authorized|reserved| port|ipv4|
-  // | 63 |    62    |  61~48 |47~32|31~0|
+  // |type|authorized|ready|reserved| port|ipv4|
+  // | 63 |    62    |  61 |  62~48 |47~32|31~0|
   uint64_t tag;
   MsgWriteThread* writeThread;
   set<string> allStatus;

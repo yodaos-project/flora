@@ -58,6 +58,14 @@ public:
     return (tag >> 32) & 0xffff;
   }
 
+  static void setReady(uint64_t& tag) {
+    tag |= 0x2000000000000000L;
+  }
+
+  static bool ready(uint64_t tag) {
+    return tag & 0x2000000000000000L;
+  }
+
   static void toString(uint64_t tag, std::string& str) {
     char buf[16];
     if (type(tag) == 0) {
@@ -113,7 +121,10 @@ bool setSocketTimeout(int socket, int32_t tm, bool rd);
 #define CMD_UPDATE_PERSIST_REQ 15
 #define CMD_DEL_PERSIST_REQ 16
 #define CMD_MONITOR_REQ 17
-#define REQ_CMD_COUNT 18
+// 连接, 认证, 初始消息订阅完后, 客户端发送ready指令
+// 服务端处理ready指令后，该客户端的连接状态可被通知到其它监视端
+#define CMD_READY_REQ 18
+#define REQ_CMD_COUNT 19
 // server --> client
 #define MIN_RESP_CMD 101
 #define CMD_AUTH_RESP 101

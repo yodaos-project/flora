@@ -498,6 +498,10 @@ public:
       goto failed;
     }
     status |= STATUS_READY;
+    // 如果id不为空，向服务端发送ready指令
+    // 服务端处理了ready后，其它监视端才能收到本客户端已连接的通知
+    if (!options.id.empty())
+      ready();
     locker.unlock();
     if (connectionCallback != nullptr)
       connectionCallback(1);
@@ -688,6 +692,12 @@ private:
   }
 
   void doNoop(CallbackSlot& slot) {}
+
+  void ready() {
+    Caps req;
+    req << CMD_READY_REQ;
+    adapter->write(req);
+  }
 
   bool handleReadData(Caps& data) {
     auto it = data.iterate();
