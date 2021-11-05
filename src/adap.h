@@ -195,7 +195,7 @@ protected:
         return false;
       }
       BASE::readDataSize += c;
-      if (c < count) {
+      if ((uint32_t)c < count) {
         count -= c;
         continue;
       }
