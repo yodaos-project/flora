@@ -1,6 +1,10 @@
 #pragma once
 
+#ifdef FLORA_NO_EPOLL
+#include <sys/select.h>
+#else
 #include <sys/epoll.h>
+#endif
 #include <unistd.h>
 #include "thr-pool.h"
 #include "common.h"
@@ -104,6 +108,38 @@ private:
     }
   }
 
+#ifdef FLORA_NO_EPOLL
+  bool initSelect() {
+    int pipefds[2] = {-1, -1};
+    if (pipe(pipefds))
+      return false;
+    auto f = fcntl(pipefds[0], F_GETFD);
+    f |= FD_CLOEXEC;
+    fcntl(pipefds[0], F_SETFD, f);
+    fcntl(pipefds[1], F_SETFD, f);
+    pipeMutex.lock();
+    rpipe = pipefds[0];
+    wpipe = pipefds[1];
+    pipeMutex.unlock();
+    FD_ZERO(&readfds);
+    FD_SET(rpipe, &readfds);
+    maxfd = rpipe + 1;
+    return true;
+  }
+
+  void closeSelect() {
+    pipeMutex.lock();
+    if (rpipe >= 0) {
+      ::close(rpipe);
+      rpipe = -1;
+    }
+    if (wpipe >= 0) {
+      ::close(wpipe);
+      wpipe = -1;
+    }
+    pipeMutex.unlock();
+  }
+#else
   bool initEpoll() {
     epollfd = epoll_create1(EPOLL_CLOEXEC);
     if (epollfd < 0)
@@ -141,6 +177,7 @@ private:
       epollfd = -1;
     }
   }
+#endif // FLORA_NO_EPOLL
 
   void wakeupPoll() {
     lock_guard<mutex> locker(pipeMutex);
@@ -151,11 +188,6 @@ private:
   }
 
   void handleLoginedClients();
-
-  void erasePollClient(int32_t sockfd) {
-    pollClients.erase(sockfd);
-    epoll_ctl(epollfd, EPOLL_CTL_DEL, sockfd, nullptr);
-  }
 
 private:
   ThreadPool thrPool{MAX_THREAD_NUM};
@@ -181,7 +213,12 @@ private:
   SocketClientMap pollClients;
   mutex pollMutex;
   function<void()> clientPollRoutine;
+#ifdef FLORA_NO_EPOLL
+  fd_set readfds;
+  int maxfd{0};
+#else
   int32_t epollfd = -1;
+#endif
   // 一对管道fd，用于唤醒epoll_wait，进行增加client socket操作
   int32_t rpipe = -1;
   int32_t wpipe = -1;

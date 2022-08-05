@@ -74,6 +74,59 @@ ClientLooper::ClientLooper() {
       }
     }
   };
+#ifdef FLORA_NO_EPOLL
+  clientPollRoutine = [this]() {
+    if (!initSelect()) {
+      KLOGE(CTAG, "init select failed.");
+      return;
+    }
+
+    unique_lock<mutex> locker(pollMutex, defer_lock);
+    while (true) {
+      locker.lock();
+      handleLoginedClients();
+      if (pollClients.empty()) {
+        locker.unlock();
+        break;
+      }
+      locker.unlock();
+      fd_set rfds;
+      FD_COPY(&readfds, &rfds);
+      auto r = select(maxfd, &rfds, nullptr, nullptr, nullptr);
+      if (r < 0) {
+        if (errno == EINTR)
+          continue;
+        KLOGE(CTAG, "select failed: %s", strerror(errno));
+        break;
+      }
+      if (FD_ISSET(rpipe, &rfds)) {
+        char c;
+        read(rpipe, &c, 1);
+      }
+      locker.lock();
+      shared_ptr<ClientImpl> cli;
+      auto it = pollClients.begin();
+      while (it != pollClients.end()) {
+        if (FD_ISSET(it->first, &rfds)) {
+          cli = it->second.lock();
+          assert(cli != nullptr);
+          // 将socket临时移出select队列，等数据处理完后再加回来
+          // 防止数据处理过程中此fd再次出现read事件
+          // 这样adapter read可以不加锁
+          FD_CLR(it->first, &readfds);
+          auto task = std::bind(clientReadRoutine, cli);
+          thrPool.push(task);
+        }
+        ++it;
+      }
+      locker.unlock();
+    }
+
+    closeSelect();
+    locker.lock();
+    pollTaskRunning = false;
+  };
+#else
   // epoll线程
   clientPollRoutine = [this]() {
     if (!initEpoll()) {
@@ -113,8 +166,7 @@ ClientLooper::ClientLooper() {
           if (it != pollClients.end())
             cli = it->second.lock();
           locker.unlock();
-          if (cli == nullptr)
-            return;
+          assert(cli != nullptr);
           auto task = std::bind(clientReadRoutine, cli);
           thrPool.push(task);
         }
@@ -125,6 +177,7 @@ ClientLooper::ClientLooper() {
     locker.lock();
     pollTaskRunning = false;
   };
+#endif // FLORA_NO_EPOLL
   clientReadRoutine = [this](shared_ptr<ClientImpl> cli) {
     if (!cli->doReadAdapter()) {
       pollMutex.lock();
@@ -133,12 +186,17 @@ ClientLooper::ClientLooper() {
       cli->closeSocket();
       return;
     }
-    // socket数据处理完，将其加回epoll
     pollMutex.lock();
+#ifdef FLORA_NO_EPOLL
+    // socket数据处理完，将其加回select队列
+    FD_SET(cli->getSocket(), &readfds);
+#else
+    // socket数据处理完，将其加回epoll
     epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = cli->getSocket();
     epoll_ctl(epollfd, EPOLL_CTL_ADD, cli->getSocket(), &ev);
+#endif
     pollMutex.unlock();
     wakeupPoll();
   };
@@ -190,6 +248,23 @@ ClientLooper::~ClientLooper() {
   thrPool.finish();
 }
 
+#ifdef FLORA_NO_EPOLL
+void ClientLooper::handleLoginedClients() {
+  auto it = loginedClients.begin();
+  while (it != loginedClients.end()) {
+    auto cli = it->lock();
+    if (cli != nullptr) {
+      auto fd = cli->getSocket();
+      FD_SET(fd, &readfds);
+      if (fd >= maxfd)
+        maxfd = fd + 1;
+      pollClients.insert(make_pair(fd, *it));
+    }
+    ++it;
+  }
+  loginedClients.clear();
+}
+#else
 void ClientLooper::handleLoginedClients() {
   auto it = loginedClients.begin();
   while (it != loginedClients.end()) {
@@ -205,3 +280,4 @@ void ClientLooper::handleLoginedClients() {
   }
   loginedClients.clear();
 }
+#endif // FLORA_NO_EPOLL

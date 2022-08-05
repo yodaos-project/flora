@@ -8,11 +8,11 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <unistd.h>
-#ifdef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
+#include <poll.h>
+#else
 #include <sys/epoll.h>
 #include <set>
-#else
-#include <poll.h>
 #endif
 #include "flora-svc.h"
 #include "flora-defs.h"
@@ -21,7 +21,7 @@
 #include "uri.h"
 #include "msg-handler.h"
 
-#ifdef FLORA_USE_EPOLL
+#ifndef FLORA_NO_EPOLL
 #define MAX_EPOLL_EVENTS 128
 #endif
 
@@ -89,11 +89,11 @@ public:
 
   void stop() {
     status = SERVICE_STATUS_STOPPED;
-#ifdef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
+    wakeupPoll();
+#else
     auto it = sockets.begin();
     ::shutdown(*it, SHUT_RDWR);
-#else
-    wakeupPoll();
 #endif
     thrPool.finish();
   }
@@ -115,18 +115,18 @@ private:
       ROKID_GERROR(STAG, FLORA_SVC_EINVAL, "no listening uri");
       return false;
     }
-#ifdef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
+    // 在非poll线程shutdown/close socket，poll不一定会返回，不同操作系统行为不一样
+    // 所以需要在poll队列中加入一个特殊的socket，用于在stop时唤醒poll线程
+    // epoll没有这种问题
+    addWakeupPollSocket();
+#else
     epollfd = epoll_create1(EPOLL_CLOEXEC);
     if (epollfd < 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "epoll_create failed: %s",
           strerror(errno));
       return false;
     }
-#else
-    // 在非poll线程shutdown/close socket，poll不一定会返回，不同操作系统行为不一样
-    // 所以需要在poll队列中加入一个特殊的socket，用于在stop时唤醒poll线程
-    // epoll没有这种问题
-    addWakeupPollSocket();
 #endif
     mutils::Uri urip;
     auto it = options.uris.begin();
@@ -247,19 +247,19 @@ failed:
   void addSocket(int fd, int type) {
     if (options.readThreadNum > 1)
       readMutex.lock();
-#ifdef FLORA_USE_EPOLL
-    struct epoll_event ev;
-    ev.events = EPOLLIN;
-    ev.data.u64 = makeEPollData(fd, type);
-    epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &ev);
-    sockets.insert(fd);
-#else
+#ifdef FLORA_NO_EPOLL
     struct pollfd tmp;
     tmp.fd = fd;
     tmp.events = POLLIN;
     tmp.revents = 0;
     allfds.push_back(tmp);
     sockets.insert(make_pair(fd, type));
+#else
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.u64 = makeEPollData(fd, type);
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &ev);
+    sockets.insert(fd);
 #endif
     if (options.readThreadNum > 1)
       readMutex.unlock();
@@ -278,19 +278,19 @@ failed:
   }
 
   void closeSockets() {
-#ifdef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
+    auto it = sockets.begin();
+    while (it != sockets.end()) {
+      ::close(it->first);
+      ++it;
+    }
+    sockets.clear();
+#else
     ::close(epollfd);
     epollfd = -1;
     auto it = sockets.begin();
     while (it != sockets.end()) {
       ::close(*it);
-      ++it;
-    }
-    sockets.clear();
-#else
-    auto it = sockets.begin();
-    while (it != sockets.end()) {
-      ::close(it->first);
       ++it;
     }
     sockets.clear();
@@ -313,11 +313,11 @@ failed:
 
   bool doPoll() {
     while (true) {
-#ifdef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
+      auto r = poll(allfds.data(), allfds.size(), -1);
+#else
       auto r = epoll_wait(epollfd, epollEvents, MAX_EPOLL_EVENTS, -1);
       polloutNum = r;
-#else
-      auto r = poll(allfds.data(), allfds.size(), -1);
 #endif
       if (r < 0) {
         if (errno == EINTR)
@@ -338,18 +338,7 @@ failed:
   void doReadAccept() {
     readTaskStatus.taskNum = 0;
     readTaskStatus.taskDone = 0;
-#ifdef FLORA_USE_EPOLL
-    for (int32_t i = 0; i < polloutNum; ++i) {
-      auto fd = fdOfEPollData(epollEvents[i].data.u64);
-      auto type = typeOfEPollData(epollEvents[i].data.u64);
-      if (options.readThreadNum > 1) {
-        ++readTaskStatus.taskNum;
-        thrPool.push(bind(&ServiceImpl::doReadTask, this, fd, type));
-      } else {
-        doReadAccept(fd, type);
-      }
-    }
-#else
+#ifdef FLORA_NO_EPOLL
     vector<struct pollfd> rfds;
     auto it = allfds.begin();
     while (it != allfds.end()) {
@@ -370,6 +359,17 @@ failed:
         doReadAccept(sit->first, sit->second);
       }
       ++it;
+    }
+#else
+    for (int32_t i = 0; i < polloutNum; ++i) {
+      auto fd = fdOfEPollData(epollEvents[i].data.u64);
+      auto type = typeOfEPollData(epollEvents[i].data.u64);
+      if (options.readThreadNum > 1) {
+        ++readTaskStatus.taskNum;
+        thrPool.push(bind(&ServiceImpl::doReadTask, this, fd, type));
+      } else {
+        doReadAccept(fd, type);
+      }
     }
 #endif
     if (options.readThreadNum > 1) {
@@ -493,10 +493,7 @@ failed:
   void closeSocket(int fd) {
     if (options.readThreadNum > 1)
       readMutex.lock();
-#ifdef FLORA_USE_EPOLL
-    epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr);
-    sockets.erase(fd);
-#else
+#ifdef FLORA_NO_EPOLL
     auto it = allfds.begin();
     while (it != allfds.end()) {
       if (it->fd == fd) {
@@ -506,6 +503,9 @@ failed:
       ++it;
     }
     sockets.erase(fd);
+#else
+    epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr);
+    sockets.erase(fd);
 #endif
     ::close(fd);
     if (options.readThreadNum > 1)
@@ -513,7 +513,7 @@ failed:
     adapterManager.eraseAdapter(fd);
   }
 
-#ifndef FLORA_USE_EPOLL
+#ifdef FLORA_NO_EPOLL
   void addWakeupPollSocket() {
     mutils::Uri urip;
     urip.parse(wakeupPollUri.c_str());
@@ -531,16 +531,16 @@ failed:
 private:
   Options options;
   ThreadPool thrPool;
-#ifdef FLORA_USE_EPOLL
-  int epollfd{-1};
-  struct epoll_event epollEvents[MAX_EPOLL_EVENTS];
-  int32_t polloutNum{0};
-  set<int32_t> sockets;
-#else
+#ifdef FLORA_NO_EPOLL
   // key: fd, value: socketType
   map<int, int> sockets;
   vector<struct pollfd> allfds;
   string wakeupPollUri{"unix:flora-svc-special.sock"};
+#else
+  int epollfd{-1};
+  struct epoll_event epollEvents[MAX_EPOLL_EVENTS];
+  int32_t polloutNum{0};
+  set<int32_t> sockets;
 #endif
   ReadTaskStatus readTaskStatus;
   AdapterManager adapterManager;
