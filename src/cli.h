@@ -445,7 +445,7 @@ public:
   }
 
   int32_t connect() {
-    Uri urip;
+    mutils::Uri urip;
     unique_lock<mutex> locker(cliMutex);
     assert(adapter == nullptr);
     // client.close，socket shutdown RD，

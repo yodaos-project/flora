@@ -128,7 +128,7 @@ private:
     // epoll没有这种问题
     addWakeupPollSocket();
 #endif
-    Uri urip;
+    mutils::Uri urip;
     auto it = options.uris.begin();
     while (it != options.uris.end()) {
       if (!urip.parse(it->c_str())) {
@@ -159,7 +159,7 @@ failed:
     return false;
   }
 
-  bool listenUnix(Uri& urip) {
+  bool listenUnix(mutils::Uri& urip) {
 #ifdef __APPLE__
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 #else
@@ -201,7 +201,7 @@ failed:
     return true;
   }
 
-  bool listenTcp(Uri& urip) {
+  bool listenTcp(mutils::Uri& urip) {
 #ifdef __APPLE__
     int fd = socket(AF_INET, SOCK_STREAM, 0);
 #else
@@ -515,14 +515,14 @@ failed:
 
 #ifndef FLORA_USE_EPOLL
   void addWakeupPollSocket() {
-    Uri urip;
+    mutils::Uri urip;
     urip.parse(wakeupPollUri.c_str());
     listenUnix(urip);
   }
 
   void wakeupPoll() {
     ClientSocketAdapter adap{options.bufsize};
-    Uri urip;
+    mutils::Uri urip;
     urip.parse(wakeupPollUri.c_str());
     adap.connect(urip, 10);
   }

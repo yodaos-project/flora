@@ -267,7 +267,7 @@ public:
     munmap(readBuffer, bufsize << 1);
   }
 
-  virtual bool connect(const Uri& urip, uint32_t timeout) = 0;
+  virtual bool connect(const mutils::Uri& urip, uint32_t timeout) = 0;
 
   bool read() {
     return doRead();
@@ -311,7 +311,7 @@ class ClientSocketAdapter : public SocketAdapter<ClientAdapter> {
 public:
   ClientSocketAdapter(uint32_t bsz) : SocketAdapter{bsz} {}
 
-  bool connect(const Uri& urip, uint32_t timeout) {
+  bool connect(const mutils::Uri& urip, uint32_t timeout) {
     int fd;
     int sockType;
     if (urip.scheme == "unix") {
@@ -419,7 +419,7 @@ private:
     return fd;
   }
 
-  bool connectUnix(int fd, const Uri& urip) {
+  bool connectUnix(int fd, const mutils::Uri& urip) {
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -436,7 +436,7 @@ private:
     return ::connect(fd, (sockaddr *)&addr, abslen) == 0;
   }
 
-  bool connectTcp(int fd, const Uri& urip) {
+  bool connectTcp(int fd, const mutils::Uri& urip) {
     struct sockaddr_in addr;
     struct hostent *hp;
     hp = gethostbyname(urip.host.c_str());
