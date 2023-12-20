@@ -26,6 +26,7 @@ public:
     } catch (exception& e) {
       ROKID_GERROR(STAG, FLORA_SVC_EINVAL,
           "adapter write failed: corrupted caps");
+      KLOGE(STAG, "adapter write failed: corrupted caps");
       return false;
     }
     return write(writeBuffer, c);
@@ -52,6 +53,8 @@ protected:
       ROKID_GERROR(STAG, FLORA_SVC_ENOBUF,
           "adapter read buffer not enough, need %u, bufsize %u",
           csz, bufsize);
+      KLOGE(STAG, "adapter read buffer not enough, need %u, bufsize %u",
+          csz, bufsize);
       return -1;
     }
     if (csz > size) {
@@ -67,6 +70,7 @@ protected:
     } catch (exception& e) {
       ROKID_GERROR(STAG, FLORA_SVC_EINVAL,
           "adapter read failed: invalid caps format");
+      KLOGE(STAG, "adapter read failed: invalid caps format");
       return -1;
     }
     readPos += csz;
@@ -156,6 +160,7 @@ protected:
     auto size = BASE::bufsize - BASE::readDataSize;
     if (size == 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ENOBUF, "adapter read buffer not enough");
+      KLOGE(STAG, "adapter read buffer not enough");
       return false;
     }
     ssize_t c;
@@ -164,10 +169,12 @@ protected:
     if (c == -1) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "read socket failed: %s",
           strerror(errno));
+      KLOGE(STAG, "read socket failed: %s", strerror(errno));
       return false;
     }
     if (c == 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket shutdown or remote closed");
+      KLOGI(STAG, "socket shutdown or remote closed");
       return false;
     }
     BASE::readDataSize += c;
@@ -178,6 +185,7 @@ protected:
     auto size = BASE::bufsize - BASE::readDataSize;
     if (size < count) {
       ROKID_GERROR(STAG, FLORA_SVC_ENOBUF, "adapter read buffer not enough");
+      KLOGE(STAG, "adapter read buffer not enough");
       return false;
     }
     ssize_t c;
@@ -188,10 +196,12 @@ protected:
           continue;
         ROKID_GERROR(STAG, FLORA_SVC_ESYS, "read socket failed: %s",
             strerror(errno));
+        KLOGE(STAG, "read socket failed: %s", strerror(errno));
         return false;
       }
       if (c == 0) {
         ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket shutdown or remote closed");
+        KLOGI(STAG, "socket shutdown or remote closed");
         return false;
       }
       BASE::readDataSize += c;
@@ -211,10 +221,12 @@ public:
     if (c == -1) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket write failed: %s",
           strerror(errno));
+      KLOGE(STAG, "socket write failed: %s", strerror(errno));
       return false;
     }
     if (c == 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket write failed: remote closed");
+      KLOGI(STAG, "socket write failed: remote closed");
       return false;
     }
     return true;
@@ -300,6 +312,7 @@ public:
     } catch (exception& e) {
       ROKID_GERROR(STAG, FLORA_SVC_EINVAL,
           "adapter read failed: invalid caps format");
+      KLOGE(STAG, "adapter read failed: invalid caps format");
       return false;
     }
     readDataSize = 0;
@@ -323,6 +336,7 @@ public:
     } else {
       ROKID_GERROR(CTAG, FLORA_CLI_EINVAL, "uri's scheme %s is invalid",
           urip.scheme.c_str());
+      KLOGE(CTAG, "uri's scheme %s is invalid", urip.scheme.c_str());
       return false;
     }
     if (fd < 0)
@@ -339,6 +353,7 @@ public:
       if (errno != EINPROGRESS) {
         ROKID_GERROR(CTAG, FLORA_CLI_ESYS, "connect failed: %s",
             strerror(errno));
+        KLOGE(CTAG, "connect failed: %s", strerror(errno));
         return false;
       }
       auto conntp = steady_clock::now();
@@ -390,6 +405,7 @@ private:
     if (fd < 0) {
       ROKID_GERROR(CTAG, FLORA_CLI_ESYS, "create socket failed: %s",
           strerror(errno));
+      KLOGE(CTAG, "create socket failed: %s", strerror(errno));
       return -1;
     }
 #ifdef __APPLE__
@@ -409,6 +425,7 @@ private:
     if (fd < 0) {
       ROKID_GERROR(CTAG, FLORA_CLI_ESYS, "create socket failed: %s",
           strerror(errno));
+      KLOGE(CTAG, "create socket failed: %s", strerror(errno));
       return -1;
     }
 #ifdef __APPLE__
@@ -443,6 +460,7 @@ private:
     if (hp == nullptr) {
       ROKID_GERROR(CTAG, FLORA_CLI_ESYS, "dns failed for host %s: %s",
           urip.host.c_str(), strerror(errno));
+      KLOGE(CTAG, "dns failed for host %s: %s", urip.host.c_str(), strerror(errno));
       return false;
     }
     memset(&addr, 0, sizeof(addr));
