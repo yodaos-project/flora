@@ -15,7 +15,7 @@ public:
   inline uint32_t getBufsize() const { return bufsize; }
 
   char* getBuffer() {
-    unique_lock<mutex> locker(bmMutex);
+    unique_lock<mutex> locker(bmMutex, defer_lock);
     if (multiThread)
       locker.lock();
     if (idleBuffers.empty())
