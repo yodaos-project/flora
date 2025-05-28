@@ -393,7 +393,10 @@ public:
     return adapter->write(req);
   }
 
-  bool replyCall(int32_t code, uint32_t id, const Caps* data) {
+  bool replyCall(int32_t code, uint32_t id, const Caps* data, bool lock) {
+    unique_lock<mutex> locker{cliMutex, defer_lock};
+    if (lock)
+      locker.lock();
     if (!checkReady())
       return false;
     Caps req;
@@ -793,7 +796,7 @@ private:
     unique_lock<mutex> locker(cliMutex);
     auto idx = checkSubHandle(handle, CallbackType::METHOD);
     if (idx < 0) {
-      replyCall(FLORA_CLI_ENOTFOUND, callid, nullptr);
+      replyCall(FLORA_CLI_ENOTFOUND, callid, nullptr, false);
       return true;
     }
     CallbackSlot& slot = callbackSlots[idx];

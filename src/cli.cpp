@@ -19,7 +19,7 @@ bool ReplyImpl::end(const Caps* data) {
     ROKID_GERROR(CTAG, FLORA_CLI_ENOT_READY, "connection disconnected");
     return false;
   }
-  return cli->replyCall(FLORA_CLI_SUCCESS, callid, data);
+  return cli->replyCall(FLORA_CLI_SUCCESS, callid, data, true);
 }
 
 ClientLooper clientLooper;

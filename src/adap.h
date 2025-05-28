@@ -44,9 +44,17 @@ public:
 
 protected:
   int32_t readFromBuffer(Caps& data) {
+    // KLOGI(STAG, "adapter.%s: buf %p, dataSize %u, readPos %u",
+    //     __func__, readBuffer, readDataSize, readPos);
     auto size = readDataSize - readPos;
-    if (size < sizeof(uint32_t))
+    if (size < sizeof(uint32_t)) {
+      if (readPos) {
+        memmove(readBuffer, readBuffer + readPos, size);
+        readDataSize -= readPos;
+        readPos = 0;
+      }
       return 1;
+    }
     uint32_t csz;
     beReadU32((uint8_t*)(readBuffer + readPos), csz);
     if (csz > bufsize) {
@@ -58,6 +66,7 @@ protected:
       return -1;
     }
     if (csz > size) {
+      // KLOGI(STAG, "size %u < csz %u, readPos %u", size, csz, readPos);
       if (readPos) {
         memmove(readBuffer, readBuffer + readPos, size);
         readDataSize -= readPos;
@@ -70,7 +79,7 @@ protected:
     } catch (exception& e) {
       ROKID_GERROR(STAG, FLORA_SVC_EINVAL,
           "adapter read failed: invalid caps format");
-      KLOGE(STAG, "adapter read failed: invalid caps format");
+      KLOGE(STAG, "adapter read failed: invalid caps format, csz %u", csz);
       return -1;
     }
     readPos += csz;
@@ -174,9 +183,11 @@ protected:
     }
     if (c == 0) {
       ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket shutdown or remote closed");
-      KLOGI(STAG, "socket shutdown or remote closed");
+      KLOGI(STAG, "socket %d shutdown or remote closed", socketfd);
       return false;
     }
+    // KLOGI(STAG, "adapter.%s: sock %d, buf %p, dataSize %u, size %u", __func__,
+    //     socketfd, BASE::readBuffer, BASE::readDataSize, c);
     BASE::readDataSize += c;
     return true;
   }
@@ -201,7 +212,7 @@ protected:
       }
       if (c == 0) {
         ROKID_GERROR(STAG, FLORA_SVC_ESYS, "socket shutdown or remote closed");
-        KLOGI(STAG, "socket shutdown or remote closed");
+        KLOGI(STAG, "socket %d shutdown or remote closed", socketfd);
         return false;
       }
       BASE::readDataSize += c;

@@ -35,8 +35,11 @@ public:
 
 private:
   char* allocBuffer() {
-    return (char*)mmap(nullptr, bufsize, PROT_READ | PROT_WRITE,
+    auto ptr = mmap(nullptr, bufsize, PROT_READ | PROT_WRITE,
         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if (ptr == (void*)-1)
+      return nullptr;
+    return (char*)ptr;
   }
 
 private:
