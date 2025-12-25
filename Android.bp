@@ -42,7 +42,6 @@ cc_library_shared {
     "-std=c++11",
     "-fexceptions",
     "-Wno-unused-parameter",
-    "-DTRACE_COMMANDS",
     "-DFLORA_USE_EPOLL",
   ],
 }
