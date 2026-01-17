@@ -1,6 +1,5 @@
 #include <errno.h>
 #include <string.h>
-#include "rlog.h"
 #include "common.h"
 #include "flora-defs.h"
 #include "data-tracer.h"
@@ -56,6 +55,8 @@ bool setSocketTimeout(int socket, int32_t tm, bool rd) {
   }
   return true;
 }
+
+RokidLogLevel GlobalConstants::loglevel{ROKID_LOGLEVEL_INFO};
 
 #ifdef TRACE_COMMANDS
 char DataTracer::dataBuffer[1024];

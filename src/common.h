@@ -14,6 +14,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include "global-error.h"
+#include "rlog.h"
 #include "flora-svc.h"
 #include "flora-cli.h"
 #include "flora-defs.h"
@@ -84,9 +85,14 @@ bool setSocketTimeout(int socket, int32_t tm, bool rd);
 // 版本5，对应release/2.0.0，大更新，不向前兼容
 #define FLORA_VERSION 5
 
+class GlobalConstants {
+public:
+  static RokidLogLevel loglevel;
+};
+
 #ifdef TRACE_COMMANDS
-#define TRACE_REQ_CMD(a, d) DataTracer::traceReqCmd(a, d);
-#define TRACE_RESP_CMD(a, d) DataTracer::traceRespCmd(a, d);
+#define TRACE_REQ_CMD(a, d) if (GlobalConstants::loglevel <= ROKID_LOGLEVEL_DEBUG) DataTracer::traceReqCmd(a, d);
+#define TRACE_RESP_CMD(a, d) if (GlobalConstants::loglevel <= ROKID_LOGLEVEL_DEBUG) DataTracer::traceRespCmd(a, d);
 #else
 #define TRACE_REQ_CMD(a, d)
 #define TRACE_RESP_CMD(a, d)

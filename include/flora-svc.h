@@ -9,7 +9,8 @@ enum class ServiceOptions {
   LISTEN_URI,
   BUFSIZE,
   READ_THREAD_NUM,
-  WRITE_THREAD_NUM
+  WRITE_THREAD_NUM,
+  LOGLEVEL,
 };
 
 class Service {

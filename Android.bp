@@ -43,5 +43,6 @@ cc_library_shared {
     "-fexceptions",
     "-Wno-unused-parameter",
     "-DFLORA_USE_EPOLL",
+    "-DTRACE_COMMANDS",
   ],
 }

@@ -65,6 +65,9 @@ public:
       case ServiceOptions::WRITE_THREAD_NUM:
         options.writeThreadNum = va_arg(ap, uint32_t);
         break;
+      case ServiceOptions::LOGLEVEL:
+        GlobalConstants::loglevel = (RokidLogLevel)va_arg(ap, int32_t);
+        break;
     }
   }
 
