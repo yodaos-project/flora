@@ -56,7 +56,7 @@ bool setSocketTimeout(int socket, int32_t tm, bool rd) {
   return true;
 }
 
-RokidLogLevel GlobalConstants::loglevel{ROKID_LOGLEVEL_INFO};
+RokidLogLevel GlobalConstants::loglevel{ROKID_DEFAULT_LOGLEVEL};
 
 #ifdef TRACE_COMMANDS
 char DataTracer::dataBuffer[1024];
