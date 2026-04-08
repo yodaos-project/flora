@@ -177,6 +177,7 @@ public:
   sub_t subscribe(const std::string& name, InstantCallback cb) {
     if (!checkIdentify(name))
       return 0;
+    unique_lock<mutex> locker(cliMutex);
     auto idx = getEmptyCallbackSlot();
     if (idx < 0)
       idx = newCallbackSlot();
@@ -185,7 +186,6 @@ public:
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)InstantCallback(cb);
     // 如果已连接，则马上发送订阅请求
-    unique_lock<mutex> locker(cliMutex);
     if (status & STATUS_READY)
       doSubscribe(callbackSlots[idx]);
     locker.unlock();
@@ -195,6 +195,7 @@ public:
   sub_t subscribe(const string& name, PersistCallback cb) {
     if (!checkIdentify(name))
       return 0;
+    unique_lock<mutex> locker(cliMutex);
     auto idx = getEmptyCallbackSlot();
     if (idx < 0)
       idx = newCallbackSlot();
@@ -203,7 +204,6 @@ public:
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)PersistCallback(cb);
     // 如果已连接，则马上发送订阅请求
-    unique_lock<mutex> locker(cliMutex);
     if (status & STATUS_READY)
       doSubscribe(callbackSlots[idx]);
     locker.unlock();
@@ -214,6 +214,7 @@ public:
       StatusCallback cb) {
     if (!checkIdentify(name))
       return 0;
+    unique_lock<mutex> locker(cliMutex);
     auto idx = getEmptyCallbackSlot();
     if (idx < 0)
       idx = newCallbackSlot();
@@ -223,7 +224,6 @@ public:
     callbackSlots[idx].target = target;
     new (callbackSlots[idx].stdfunc)StatusCallback(cb);
     // 如果已连接，则马上发送订阅请求
-    unique_lock<mutex> locker(cliMutex);
     if (status & STATUS_READY)
       doSubscribe(callbackSlots[idx]);
     locker.unlock();
@@ -244,6 +244,7 @@ public:
           "declare method not allowed", name.c_str());
       return 0;
     }
+    unique_lock<mutex> locker(cliMutex);
     auto idx = getEmptyCallbackSlot();
     if (idx < 0)
       idx = newCallbackSlot();
@@ -252,7 +253,6 @@ public:
     callbackSlots[idx].name = name;
     new (callbackSlots[idx].stdfunc)MethodCallback(cb);
     // 如果已连接，则马上发送订阅请求
-    unique_lock<mutex> locker(cliMutex);
     if (status & STATUS_READY)
       doSubscribe(callbackSlots[idx]);
     locker.unlock();
